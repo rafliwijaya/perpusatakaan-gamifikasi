@@ -31,7 +31,11 @@ export default function Login() {
     return (
         <div style={{maxWidth:"500px", margin:"3rem auto"}}>
             <form handleLogin>
-                <input type="text" />
+                <input type="text"
+                placeholder="Email"
+                value={email}
+                onChange={() => setEmail(e.target.value)}
+                />
             </form>
         </div>
     )

@@ -15,12 +15,19 @@ export default function Login() {
         setLoading(true)
         return
 
-        const {data, error} = await supabase.auth.signInWithPassword ({
+        if(!email.endsWith("mhs.unimed.ac.id")) {
+            setError("Harus menggunakan email kampus")
+            setLoading(false)
+            return
+        }
+
+
+        const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password
         })
 
-        if(error) {
+        if (error) {
             setError(error.message)
             return
         }
@@ -29,12 +36,18 @@ export default function Login() {
     }
 
     return (
-        <div style={{maxWidth:"500px", margin:"3rem auto"}}>
+        <div style={{ maxWidth: "500px", margin: "3rem auto" }}>
             <form handleLogin>
-                <input type="text"
-                placeholder="Email"
-                value={email}
-                onChange={() => setEmail(e.target.value)}
+                <input type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={() => setEmail(e.target.value)}
+                />
+                <br /><br />
+                <input type="Password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={() => setPassword(e.target.value)}
                 />
             </form>
         </div>

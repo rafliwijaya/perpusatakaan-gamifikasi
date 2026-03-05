@@ -31,6 +31,12 @@ export default function Login() {
 
     return (
         <div style={{ maxWidth: "500px", margin: "3rem auto" }}>
+            {error && <p style={{
+                color: "white",
+                backgroundColor: "red",
+                padding: "10px",
+                borderRadius: "5px"
+            }}>{error}</p>}
             <form onSubmit={handleLogin}>
                 <input type="email"
                     placeholder="Email"

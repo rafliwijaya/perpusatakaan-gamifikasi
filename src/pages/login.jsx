@@ -8,19 +8,12 @@ export default function Login() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [error, setError] = useState("")
-    const [loading, setLoading] = useState(flase)
+    const [loading, setLoading] = useState(false)
 
     const handleLogin = async (e) => {
-        e.preventDefault
+        e.preventDefault()
+        setError("")
         setLoading(true)
-        return
-
-        if(!email.endsWith("mhs.unimed.ac.id")) {
-            setError("Harus menggunakan email kampus")
-            setLoading(false)
-            return
-        }
-
 
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
@@ -29,6 +22,7 @@ export default function Login() {
 
         if (error) {
             setError(error.message)
+            setLoading(false)
             return
         }
 
@@ -37,18 +31,25 @@ export default function Login() {
 
     return (
         <div style={{ maxWidth: "500px", margin: "3rem auto" }}>
-            <form handleLogin>
+            <form onSubmit={handleLogin}>
                 <input type="email"
                     placeholder="Email"
                     value={email}
-                    onChange={() => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
                 />
                 <br /><br />
                 <input type="Password"
                     placeholder="Password"
                     value={password}
-                    onChange={() => setPassword(e.target.value)}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
                 />
+                <br /><b>
+                    <button type="submit" disabled={loading}>
+                        {loading ? "Loading" : "Login"}
+                    </button>
+                </b>
             </form>
         </div>
     )

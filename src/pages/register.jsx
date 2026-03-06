@@ -10,4 +10,14 @@ export default function Register() {
     const [paswword, setPassword] = useState("")
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
+
+    const handleRegister = async (e) => {
+        e.preventDefault()
+        setLoading(true)
+        setError("")
+
+        const {data, error} = await supabase.auth.signUp ({
+            
+        })
+    }
 }

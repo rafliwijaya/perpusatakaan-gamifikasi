@@ -174,7 +174,7 @@ export default function StudentHistory() {
                         fontSize: '12px', color: 'var(--danger)', fontWeight: 600,
                         display: 'inline-flex', alignItems: 'center', gap: '6px',
                       }}>
-                        ⚠️ Denda: Rp {currentFine.toLocaleString('id-ID')}
+                        Denda: Rp {currentFine.toLocaleString('id-ID')}
                         {t.status === 'late' && ' (belum dibayar)'}
                       </div>
                     )}

@@ -3,7 +3,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/authcontext'
 
 // pages
-import LoginPage from './pages/LoginPage'
+import LoginPage from './pages/login'
 // import AdminDashboard from './pages/admin/AdminDashboard'
 // import AdminBooks from './pages/admin/AdminBooks'
 // import AdminTransactions from './pages/admin/AdminTransactions'
@@ -11,14 +11,14 @@ import LoginPage from './pages/LoginPage'
 // import AdminReports from './pages/admin/AdminReports'
 // import AdminLeaderboard from './pages/admin/AdminLeaderboard'
 
-import StudentHome from './pages/student/StudentHome'
-import StudentBorrow from './pages/student/StudentBorrow'
-import StudentHistory from './pages/student/StudentHistory'
-import StudentProfile from './pages/student/StudentProfile'
+import StudentHome from './pages/student/studenthome'
+import StudentBorrow from './pages/student/studentborrow'
+import StudentHistory from './pages/student/studenthistory'
+import StudentProfile from './pages/student/studentprofil'
 
 // layouts
-import AdminLayout from './components/admin/AdminLayout'
-import StudentLayout from './components/student/StudentLayout'
+import AdminLayout from './components/admin/adminlayout'
+import StudentLayout from './components/student/studentlayout'
 
 function ProtectedRoute({ children, requiredRole }) {
   const { user, role, loading } = useAuth()

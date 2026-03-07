@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/authcontext'
 import {
   BookOpen, LayoutDashboard, BookCopy, ArrowLeftRight,
   Users, BarChart2, Trophy, LogOut, Menu, X, ChevronRight

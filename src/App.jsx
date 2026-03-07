@@ -1,15 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/authcontext'
 
 // pages
 import LoginPage from './pages/LoginPage'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminBooks from './pages/admin/AdminBooks'
-import AdminTransactions from './pages/admin/AdminTransactions'
-import AdminStudents from './pages/admin/AdminStudents'
-import AdminReports from './pages/admin/AdminReports'
-import AdminLeaderboard from './pages/admin/AdminLeaderboard'
+// import AdminDashboard from './pages/admin/AdminDashboard'
+// import AdminBooks from './pages/admin/AdminBooks'
+// import AdminTransactions from './pages/admin/AdminTransactions'
+// import AdminStudents from './pages/admin/AdminStudents'
+// import AdminReports from './pages/admin/AdminReports'
+// import AdminLeaderboard from './pages/admin/AdminLeaderboard'
 
 import StudentHome from './pages/student/StudentHome'
 import StudentBorrow from './pages/student/StudentBorrow'

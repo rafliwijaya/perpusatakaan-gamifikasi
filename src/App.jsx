@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './context/authcontext'
 
 // pages
 import LoginPage from './pages/login'
-// import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminDashboard from './pages/admin/admindashboard'
 // import AdminBooks from './pages/admin/AdminBooks'
 // import AdminTransactions from './pages/admin/AdminTransactions'
 // import AdminStudents from './pages/admin/AdminStudents'
@@ -69,11 +69,11 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route index element={<AdminDashboard />} />
-        <Route path="books" element={<AdminBooks />} />
+        {/* <Route path="books" element={<AdminBooks />} />
         <Route path="transactions" element={<AdminTransactions />} />
         <Route path="students" element={<AdminStudents />} />
         <Route path="reports" element={<AdminReports />} />
-        <Route path="leaderboard" element={<AdminLeaderboard />} />
+        <Route path="leaderboard" element={<AdminLeaderboard />} /> */}
       </Route>
 
       {/* Student Routes */}

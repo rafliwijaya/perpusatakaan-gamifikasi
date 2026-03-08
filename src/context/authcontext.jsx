@@ -5,12 +5,11 @@ const AuthContext = createContext({})
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null) // student data or admin flag
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [role, setRole] = useState(null) // 'admin' | 'student'
+  const [role, setRole] = useState(null) // 'admin' | 'superadmin' | 'student'
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
@@ -20,7 +19,6 @@ export function AuthProvider({ children }) {
       }
     })
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user)
@@ -38,46 +36,48 @@ export function AuthProvider({ children }) {
 
   const fetchProfile = async (authUser) => {
     try {
-      // Check if admin (email matches admin pattern or metadata)
-      const isAdmin = authUser.user_metadata?.role === 'admin' ||
-        authUser.email === import.meta.env.VITE_ADMIN_EMAIL
+      // 1. Cek dulu apakah user ini ada di tabel admins
+      const { data: adminData } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('auth_id', authUser.id)
+        .single()
 
-      if (isAdmin) {
-        setRole('admin')
-        setProfile({ email: authUser.email, name: 'Administrator' })
+      if (adminData) {
+        setRole(adminData.role) // 'admin' atau 'superadmin'
+        setProfile({
+          id: adminData.id,
+          name: adminData.name,
+          email: adminData.email,
+          role: adminData.role,
+        })
         setLoading(false)
         return
       }
 
-      // Try to find student by email (NIS@school.com format)
-      const nis = authUser.email.split('@')[0]
-      const { data: student, error } = await supabase
+      // 2. Bukan admin, cek di tabel students
+      const { data: studentData } = await supabase
         .from('students')
         .select('*, classes(id, name, teacher)')
-        .eq('nis', nis)
+        .eq('auth_id', authUser.id)
         .single()
 
-      if (error || !student) {
-        // Fallback: search by student_id linked to auth
-        const { data: studentByAuth } = await supabase
-          .from('students')
-          .select('*, classes(id, name, teacher)')
-          .eq('auth_id', authUser.id)
-          .single()
-
-        if (studentByAuth) {
-          setRole('student')
-          setProfile(studentByAuth)
-        } else {
-          setRole('admin') // default to admin if no student found
-          setProfile({ email: authUser.email, name: 'Administrator' })
-        }
-      } else {
+      if (studentData) {
         setRole('student')
-        setProfile(student)
+        setProfile(studentData)
+        setLoading(false)
+        return
       }
+
+      // 3. Tidak ditemukan di keduanya — sign out otomatis
+      console.warn('User tidak ditemukan di admins maupun students:', authUser.id)
+      await supabase.auth.signOut()
+      setUser(null)
+      setProfile(null)
+      setRole(null)
+
     } catch (err) {
-      console.error('Error fetching profile:', err)
+      console.error('Error fetchProfile:', err)
     } finally {
       setLoading(false)
     }
@@ -92,8 +92,16 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
   }
 
+  const isAdmin = role === 'admin' || role === 'superadmin'
+  const isSuperAdmin = role === 'superadmin'
+  const isStudent = role === 'student'
+
   return (
-    <AuthContext.Provider value={{ user, profile, role, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{
+      user, profile, role,
+      loading, signIn, signOut,
+      isAdmin, isSuperAdmin, isStudent,
+    }}>
       {children}
     </AuthContext.Provider>
   )

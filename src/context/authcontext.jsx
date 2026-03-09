@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
 
   const fetchProfile = async (authUser) => {
     try {
-      // 1. Cek dulu apakah user ini ada di tabel admins
+      // cek dulu apakah user ini ada di tabel admins
       const { data: adminData } = await supabase
         .from('admins')
         .select('*')
@@ -55,7 +55,7 @@ export function AuthProvider({ children }) {
         return
       }
 
-      // 2. Bukan admin, cek di tabel students
+      // bkn admin, cek di tabel students
       const { data: studentData } = await supabase
         .from('students')
         .select('*, classes(id, name, teacher)')
@@ -69,7 +69,7 @@ export function AuthProvider({ children }) {
         return
       }
 
-      // 3. Tidak ditemukan di keduanya — sign out otomatis
+      // tdak ditemukan di keduanya — sign out otomatis
       console.warn('User tidak ditemukan di admins maupun students:', authUser.id)
       await supabase.auth.signOut()
       setUser(null)

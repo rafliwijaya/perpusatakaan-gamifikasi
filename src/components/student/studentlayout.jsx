@@ -42,7 +42,7 @@ export default function StudentLayout() {
             <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>Perpustakaan</span>
           </NavLink>
 
-          {/* Desktop Nav */}
+          {/* desktop Nav */}
           <nav style={{ display: 'flex', gap: '4px' }} className="desktop-nav">
             {navItems.map(({ to, icon: Icon, label, exact }) => (
               <NavLink
@@ -65,7 +65,7 @@ export default function StudentLayout() {
             ))}
           </nav>
 
-          {/* Right Side */}
+          {/* kanan */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* User chip */}
             <div style={{
@@ -111,7 +111,7 @@ export default function StudentLayout() {
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* mbile meunu */}
         {menuOpen && (
           <div style={{
             borderTop: '1px solid var(--border)',
@@ -140,7 +140,7 @@ export default function StudentLayout() {
         )}
       </header>
 
-      {/* Page Content */}
+      {/* Page Cntent */}
       <main style={{ flex: 1, padding: '24px 0' }}>
         <div className="container">
           <Outlet />

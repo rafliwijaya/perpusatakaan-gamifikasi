@@ -292,7 +292,6 @@ tbody tr:hover td {
   background: var(--primary-bg);
 }
 
-/* Empty state */
 .empty-state {
   text-align: center;
   padding: 64px 24px;

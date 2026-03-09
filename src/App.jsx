@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from './context/authcontext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
-// pages
+// Pages
 import LoginPage from './pages/login'
 import AdminDashboard from './pages/admin/admindashboard'
 // import AdminBooks from './pages/admin/AdminBooks'
@@ -16,12 +16,12 @@ import StudentBorrow from './pages/student/studentborrow'
 import StudentHistory from './pages/student/studenthistory'
 import StudentProfile from './pages/student/studentprofil'
 
-// layouts
+// Layouts
 import AdminLayout from './components/admin/adminlayout'
 import StudentLayout from './components/student/studentlayout'
 
 function ProtectedRoute({ children, requiredRole }) {
-  const { user, role, loading } = useAuth()
+  const { user, isAdmin, isStudent, loading } = useAuth()
 
   if (loading) {
     return (
@@ -32,15 +32,19 @@ function ProtectedRoute({ children, requiredRole }) {
   }
 
   if (!user) return <Navigate to="/login" replace />
-  if (requiredRole && role !== requiredRole) {
-    return <Navigate to={role === 'admin' ? '/admin' : '/home'} replace />
+
+  if (requiredRole === 'admin' && !isAdmin) {
+    return <Navigate to="/home" replace />
+  }
+  if (requiredRole === 'student' && !isStudent) {
+    return <Navigate to="/admin" replace />
   }
 
   return children
 }
 
 function RootRedirect() {
-  const { user, role, loading } = useAuth()
+  const { user, isAdmin, loading } = useAuth()
 
   if (loading) return (
     <div className="page-loader">
@@ -49,7 +53,7 @@ function RootRedirect() {
   )
 
   if (!user) return <Navigate to="/login" replace />
-  if (role === 'admin') return <Navigate to="/admin" replace />
+  if (isAdmin) return <Navigate to="/admin" replace />
   return <Navigate to="/home" replace />
 }
 

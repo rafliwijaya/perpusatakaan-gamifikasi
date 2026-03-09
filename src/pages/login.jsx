@@ -50,7 +50,6 @@ export default function LoginPage() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-light)' }}>
-      {/* Left Panel - Branding */}
       <div style={{
         flex: 1,
         background: 'linear-gradient(135deg, #1a1f0e 0%, #2d3a14 50%, #3d5019 100%)',
@@ -61,7 +60,7 @@ export default function LoginPage() {
         position: 'relative',
         overflow: 'hidden',
       }} className="login-left-panel">
-        {/* Background decorations */}
+        {/* bacground decoratios */}
         <div style={{
           position: 'absolute', top: '-80px', right: '-80px',
           width: '400px', height: '400px',
@@ -75,7 +74,6 @@ export default function LoginPage() {
           borderRadius: '50%',
         }} />
 
-        {/* Floating book cards decoration */}
         <div style={{
           position: 'absolute', top: '20%', right: '40px',
           display: 'flex', flexDirection: 'column', gap: '12px', opacity: 0.4,
@@ -105,7 +103,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Headline */}
+          {/* headline */}
           <h1 style={{
             fontSize: '42px', fontWeight: 800, color: 'white',
             lineHeight: 1.15, marginBottom: '20px',
@@ -118,7 +116,6 @@ export default function LoginPage() {
             Platform perpustakaan digital dengan sistem gamifikasi. Kelas dengan bacaan terbanyak mendapat badge kehormatan.
           </p>
 
-          {/* Stats */}
           <div style={{ display: 'flex', gap: '32px', marginTop: '48px' }}>
             {[
               { label: 'Buku Tersedia', val: '1,200+' },
@@ -133,8 +130,7 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-
-      {/* Right Panel - Login Form */}
+{/* login */}
       <div style={{
         width: '480px',
         flexShrink: 0,

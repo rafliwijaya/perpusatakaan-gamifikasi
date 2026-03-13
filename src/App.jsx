@@ -1,13 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/authcontext'
 
 // Pages
 import LoginPage from './pages/login'
 import AdminDashboard from './pages/admin/admindashboard'
 // import AdminBooks from './pages/admin/AdminBooks'
 // import AdminTransactions from './pages/admin/AdminTransactions'
-// import AdminStudents from './pages/admin/AdminStudents'
+import AdminStudents from './pages/admin/adminstudent'
 // import AdminReports from './pages/admin/AdminReports'
 // import AdminLeaderboard from './pages/admin/AdminLeaderboard'
 
@@ -73,11 +73,11 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route index element={<AdminDashboard />} />
-        {/* <Route path="books" element={<AdminBooks />} />
-        <Route path="transactions" element={<AdminTransactions />} />
+        {/* <Route path="books" element={<AdminBooks />} /> */}
+        {/* <Route path="transactions" element={<AdminTransactions />} /> */}
         <Route path="students" element={<AdminStudents />} />
-        <Route path="reports" element={<AdminReports />} />
-        <Route path="leaderboard" element={<AdminLeaderboard />} /> */}
+        {/* <Route path="reports" element={<AdminReports />} /> */}
+        {/* <Route path="leaderboard" element={<AdminLeaderboard />} /> */}
       </Route>
 
       {/* Student Routes */}

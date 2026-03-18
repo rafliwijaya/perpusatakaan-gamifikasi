@@ -6,10 +6,10 @@ import { AuthProvider, useAuth } from './context/authcontext'
 import LoginPage from './pages/login'
 import AdminDashboard from './pages/admin/admindashboard'
 import AdminBooks from './pages/admin/adminbooks'
-// import AdminTransactions from './pages/admin/AdminTransactions'
+import AdminTransactions from './pages/admin/admintrasactions'
 import AdminStudents from './pages/admin/adminstudent'
-// import AdminReports from './pages/admin/AdminReports'
-// import AdminLeaderboard from './pages/admin/AdminLeaderboard'
+import AdminReports from './pages/admin/adminreport'
+import AdminLeaderboard from './pages/admin/adminleaderboard'
 
 import StudentHome from './pages/student/studenthome'
 import StudentBorrow from './pages/student/studentborrow'
@@ -74,10 +74,10 @@ function AppRoutes() {
       }>
         <Route index element={<AdminDashboard />} />
         <Route path="books" element={<AdminBooks />} />
-        {/* <Route path="transactions" element={<AdminTransactions />} /> */}
+        <Route path="transactions" element={<AdminTransactions />} />
         <Route path="students" element={<AdminStudents />} />
-        {/* <Route path="reports" element={<AdminReports />} /> */}
-        {/* <Route path="leaderboard" element={<AdminLeaderboard />} /> */}
+        <Route path="reports" element={<AdminReports />} />
+        <Route path="leaderboard" element={<AdminLeaderboard />} />
       </Route>
 
       {/* Student Routes */}

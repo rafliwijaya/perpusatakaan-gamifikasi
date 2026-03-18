@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/authcontext'
 import { supabase } from '../lib/supabase'
 import { BookOpen, User, Lock, Eye, EyeOff, Shield, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'

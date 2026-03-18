@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/authcontext'
 import { Star, Award, BookOpen, Trophy, TrendingUp, Target } from 'lucide-react'
 
 const BADGE_LEVELS = [

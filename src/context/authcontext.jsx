@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext({})
@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState(null) // 'admin' | 'superadmin' | 'student'
+  const fetchingRef = useRef(false) // cegah fetch ganda
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -19,15 +20,17 @@ export function AuthProvider({ children }) {
       }
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        fetchProfile(session.user)
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
         setUser(null)
         setProfile(null)
         setRole(null)
         setLoading(false)
+        return
+      }
+      if (session?.user) {
+        setUser(session.user)
+        fetchProfile(session.user)
       }
     })
 
@@ -35,51 +38,57 @@ export function AuthProvider({ children }) {
   }, [])
 
   const fetchProfile = async (authUser) => {
+    // Cegah fetch berulang untuk user yang sama
+    if (fetchingRef.current) return
+    fetchingRef.current = true
+
     try {
-      // 1. Cek dulu apakah user ini ada di tabel admins
-      const { data: adminData } = await supabase
+      // 1. Cek tabel admins
+      const { data: adminData, error: adminError } = await supabase
         .from('admins')
-        .select('*')
+        .select('id, name, email, role')
         .eq('auth_id', authUser.id)
-        .single()
+        .maybeSingle()
 
       if (adminData) {
-        setRole(adminData.role) // 'admin' atau 'superadmin'
+        setRole(adminData.role)
         setProfile({
           id: adminData.id,
           name: adminData.name,
           email: adminData.email,
           role: adminData.role,
         })
-        setLoading(false)
         return
       }
 
-      // 2. Bukan admin, cek di tabel students
-      const { data: studentData } = await supabase
+      // 2. Cek tabel students
+      const { data: studentData, error: studentError } = await supabase
         .from('students')
-        .select('*, classes(id, name, teacher)')
+        .select('id, name, nis, class_id, auth_id, classes(id, name, teacher)')
         .eq('auth_id', authUser.id)
-        .single()
+        .maybeSingle()
 
       if (studentData) {
         setRole('student')
         setProfile(studentData)
-        setLoading(false)
         return
       }
 
-      // 3. Tidak ditemukan di keduanya — sign out otomatis
-      console.warn('User tidak ditemukan di admins maupun students:', authUser.id)
-      await supabase.auth.signOut()
+      // 3. Tidak ditemukan di keduanya
+      // Kemungkinan: siswa baru yang belum ada di tabel students
+      // Atau akun tidak valid — sign out tanpa loop
+      console.warn('Auth user tidak ditemukan di admins/students:', authUser.id)
       setUser(null)
       setProfile(null)
       setRole(null)
+      // Panggil signOut langsung tanpa trigger onAuthStateChange lagi
+      await supabase.auth.signOut()
 
     } catch (err) {
-      console.error('Error fetchProfile:', err)
+      console.error('fetchProfile error:', err.message)
     } finally {
       setLoading(false)
+      fetchingRef.current = false
     }
   }
 
@@ -89,9 +98,13 @@ export function AuthProvider({ children }) {
   }
 
   const signOut = async () => {
+    setUser(null)
+    setProfile(null)
+    setRole(null)
     await supabase.auth.signOut()
   }
 
+  // Helper flags
   const isAdmin = role === 'admin' || role === 'superadmin'
   const isSuperAdmin = role === 'superadmin'
   const isStudent = role === 'student'

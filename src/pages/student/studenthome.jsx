@@ -13,8 +13,8 @@ export default function StudentHome() {
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [categories, setCategories] = useState([])
-  const [borrowing, setBorrowing] = useState(null) // book id being borrowed
-  const [activeBorrows, setActiveBorrows] = useState([]) // student's current borrows
+  const [borrowing, setBorrowing] = useState(null) // book id dipnjam
+  const [activeBorrows, setActiveBorrows] = useState([]) // pinjaman student satt ini 
   const [hasFine, setHasFine] = useState(false)
 
   useEffect(() => {
@@ -32,7 +32,6 @@ export default function StudentHome() {
   }
 
   const checkStudentStatus = async () => {
-    // Check active borrows
     const { data: borrows } = await supabase
       .from('transactions')
       .select('*')
@@ -41,7 +40,6 @@ export default function StudentHome() {
 
     setActiveBorrows(borrows || [])
 
-    // Check unpaid fines
     const { data: fines } = await supabase
       .from('transactions')
       .select('fine_amount')
@@ -63,7 +61,7 @@ export default function StudentHome() {
     if (filterCategory) query = query.eq('category', filterCategory)
     if (filterType) query = query.eq('type', filterType)
     if (filterStatus) query = query.eq('status', filterStatus)
-    else query = query.in('status', ['available', 'borrowed']) // don't show cancelled
+    else query = query.in('status', ['available', 'borrowed'])
 
     const { data, error } = await query.limit(60)
     if (!error) setBooks(data || [])
@@ -89,7 +87,6 @@ export default function StudentHome() {
 
     setBorrowing(book.id)
     try {
-      // Create pending transaction
       const { error: txError } = await supabase.from('transactions').insert({
         book_id: book.id,
         student_id: profile.id,
@@ -101,7 +98,6 @@ export default function StudentHome() {
 
       if (txError) throw txError
 
-      // Mark book as borrowed
       await supabase.from('books').update({ status: 'borrowed' }).eq('id', book.id)
 
       toast.success(
@@ -128,7 +124,6 @@ export default function StudentHome() {
 
   return (
     <div className="fade-in">
-      {/* Welcome Banner */}
       <div style={{
         background: 'linear-gradient(135deg, #1a1f0e 0%, #2d3a14 100%)',
         borderRadius: 'var(--radius-xl)',
@@ -176,7 +171,6 @@ export default function StudentHome() {
         </div>
       </div>
 
-      {/* Search & Filters */}
       <div className="card" style={{ padding: '16px', marginBottom: '20px' }}>
         <div style={{ position: 'relative', marginBottom: '12px' }}>
           <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -219,14 +213,12 @@ export default function StudentHome() {
         </div>
       </div>
 
-      {/* Results count */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
           {loading ? 'Memuat...' : `${books.length} buku ditemukan`}
         </p>
       </div>
 
-      {/* Books Grid */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
           <div className="spinner" />

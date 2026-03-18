@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/authcontext'
+import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 import { BookOpen, User, Lock, Eye, EyeOff, Shield, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -20,32 +21,47 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      let loginEmail
       if (loginType === 'student') {
-        // Student: NIS as username, email = NIS@perpustakaan.sch.id
-        loginEmail = `${nis}@perpustakaan.sch.id`
+        await handleStudentLogin()
       } else {
-        loginEmail = email
+        await handleAdminLogin()
       }
-
-      const { error } = await signIn(loginEmail, password)
-
-      if (error) {
-        toast.error(
-          error.message === 'Invalid login credentials'
-            ? 'NIS atau password salah'
-            : error.message
-        )
-        return
-      }
-
-      toast.success('Login berhasil!')
-      navigate(loginType === 'admin' ? '/admin' : '/home')
     } catch (err) {
       toast.error('Terjadi kesalahan. Coba lagi.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleAdminLogin = async () => {
+    const { error } = await signIn(email, password)
+    if (error) {
+      toast.error(
+        error.message === 'Invalid login credentials'
+          ? 'Email atau password salah'
+          : error.message
+      )
+      return
+    }
+    toast.success('Login berhasil!')
+    navigate('/admin')
+  }
+
+  const handleStudentLogin = async () => {
+    const loginEmail = `${nis.trim()}@perpustakaan.sch.id`
+
+    const { error } = await signIn(loginEmail, password)
+    if (error) {
+      if (error.message === 'Invalid login credentials') {
+        toast.error('NIS atau password salah.')
+      } else {
+        toast.error(error.message)
+      }
+      return
+    }
+
+    toast.success('Selamat datang!')
+    navigate('/home')
   }
 
   return (
@@ -60,7 +76,6 @@ export default function LoginPage() {
         position: 'relative',
         overflow: 'hidden',
       }} className="login-left-panel">
-        {/* bacground decoratios */}
         <div style={{
           position: 'absolute', top: '-80px', right: '-80px',
           width: '400px', height: '400px',
@@ -103,7 +118,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* headline */}
           <h1 style={{
             fontSize: '42px', fontWeight: 800, color: 'white',
             lineHeight: 1.15, marginBottom: '20px',
@@ -116,6 +130,7 @@ export default function LoginPage() {
             Platform perpustakaan digital dengan sistem gamifikasi. Kelas dengan bacaan terbanyak mendapat badge kehormatan.
           </p>
 
+          {/* Stats */}
           <div style={{ display: 'flex', gap: '32px', marginTop: '48px' }}>
             {[
               { label: 'Buku Tersedia', val: '1,200+' },
@@ -130,7 +145,7 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-{/* login */}
+
       <div style={{
         width: '480px',
         flexShrink: 0,
@@ -148,7 +163,6 @@ export default function LoginPage() {
             Pilih tipe akun dan masukkan kredensial kamu
           </p>
 
-          {/* Toggle Login Type */}
           <div style={{
             display: 'flex', gap: '0',
             background: 'var(--bg-light)',
@@ -292,7 +306,6 @@ export default function LoginPage() {
             </p>
           )}
 
-          {/* Decorative footer */}
           <div style={{
             marginTop: '40px', paddingTop: '24px',
             borderTop: '1px solid var(--border-light)',

@@ -116,7 +116,7 @@ export default function StudentProfile() {
 
           {level.next && (
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
-              +{level.next.needed} poin lagi untuk {level.next.label}
+              {/* +{level.next.needed} poin lagi untuk {level.next.label} */} Lorem ipsum dolor sit amet consectetur.
             </p>
           )}
         </div>

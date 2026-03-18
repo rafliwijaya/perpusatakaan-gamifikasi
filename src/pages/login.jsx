@@ -127,7 +127,8 @@ export default function LoginPage() {
           </h1>
 
           <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.55)', maxWidth: '340px', lineHeight: 1.7 }}>
-            Platform perpustakaan digital dengan sistem gamifikasi. Kelas dengan bacaan terbanyak mendapat badge kehormatan.
+            {/* Platform perpustakaan digital dengan sistem gamifikasi. Kelas dengan bacaan terbanyak mendapat badge kehormatan. */}
+            Lorem ipsum dolor sit, amet consectetur adipisicing elit. Ratione dolorem adipisci ipsa aliquam facere sunt.
           </p>
 
           {/* Stats */}

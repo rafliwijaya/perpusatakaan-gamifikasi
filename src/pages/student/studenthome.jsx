@@ -260,14 +260,14 @@ export default function StudentHome() {
               >
                 {/* Cover */}
                 <div style={{
-                  height: '180px',
+                  aspectRatio:'3/4',
                   background: 'var(--primary-pale)',
                   position: 'relative',
                   overflow: 'hidden',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   {book.cover_url ? (
-                    <img src={book.cover_url} alt={book.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={book.cover_url} alt={book.title} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   ) : (
                     <div style={{ textAlign: 'center' }}>
                       <BookOpen size={48} color="var(--primary)" strokeWidth={1.5} />

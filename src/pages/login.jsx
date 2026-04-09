@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/authcontext'
+import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { BookOpen, User, Lock, Eye, EyeOff, Shield, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -9,12 +9,60 @@ export default function LoginPage() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
 
-  const [loginType, setLoginType] = useState('student') // 'student' | 'admin'
+  const [loginType, setLoginType] = useState('student')
   const [nis, setNis] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [splashDone, setSplashDone] = useState(false)
+
+  const introRef = useRef(null)
+  const bgSecondRef = useRef(null)
+  const logoSpanRefs = useRef([])
+
+  useEffect(() => {
+    const spans = logoSpanRefs.current
+
+    // Munculkan teks satu per satu
+    spans.forEach((span, idx) => {
+      setTimeout(() => {
+        if (span) span.classList.add('splash-active')
+      }, (idx + 1) * 400)
+    })
+
+    // Fade out teks
+    setTimeout(() => {
+      spans.forEach((span, idx) => {
+        setTimeout(() => {
+          if (span) {
+            span.classList.remove('splash-active')
+            span.classList.add('splash-fade')
+          }
+        }, (idx + 1) * 50)
+      })
+    }, 2000)
+
+    // Slide up bg-second
+    setTimeout(() => {
+      if (bgSecondRef.current) {
+        bgSecondRef.current.style.left = '100vw'
+        bgSecondRef.current.style.opacity = '0'
+      }
+    }, 1700)
+
+    // Slide up intro
+    setTimeout(() => {
+      if (introRef.current) {
+        introRef.current.style.left = '100vw'
+      }
+    }, 2300)
+
+    // Hapus splash dari DOM
+    setTimeout(() => {
+      setSplashDone(true)
+    }, 3400)
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -66,6 +114,62 @@ export default function LoginPage() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-light)' }}>
+
+      {/* ── SPLASH SCREEN ── */}
+      {!splashDone && (
+        <div
+          ref={introRef}
+          style={{
+            position: 'fixed', zIndex: 9999,
+            left: 0, top: 0,
+            width: '100%', height: '100vh',
+            background: '#6ab818',
+            transition: 'left 1s ease',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          {/* bg-second layer */}
+          <div
+            ref={bgSecondRef}
+            style={{
+              position: 'absolute', zIndex: -1,
+              top: 0, left: 0,
+              width: '100%', height: '100%',
+              background: '#fff',
+              opacity: 1,
+              transition: 'left 2.2s ease-in-out, opacity 10s ease-in-out',
+            }}
+          />
+
+          {/* Teks splash */}
+          <h1 style={{
+            position: 'absolute',
+            top: '40%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: '#1a1f0e',
+            fontSize: '2rem',
+            fontFamily: 'Poppins, sans-serif',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            margin: 0,
+          }}>
+            <span
+              ref={el => logoSpanRefs.current[0] = el}
+              className="splash-logo"
+            >
+              Perpustakaan{' '}
+            </span>
+            <span
+              ref={el => logoSpanRefs.current[1] = el}
+              className="splash-logo"
+            >
+              <span style={{ color: 'var(--primary)' }}>Digital.</span>
+            </span>
+          </h1>
+        </div>
+      )}
+      {/* ── END SPLASH SCREEN ── */}
+      {/* left panell*/}
       <div style={{
         flex: 1,
         background: 'linear-gradient(135deg, #1a1f0e 0%, #2d3a14 50%, #3d5019 100%)',
@@ -76,6 +180,7 @@ export default function LoginPage() {
         position: 'relative',
         overflow: 'hidden',
       }} className="login-left-panel">
+        {/* Background decoration */}
         <div style={{
           position: 'absolute', top: '-80px', right: '-80px',
           width: '400px', height: '400px',
@@ -89,6 +194,7 @@ export default function LoginPage() {
           borderRadius: '50%',
         }} />
 
+        {/* Floaatng book */}
         <div style={{
           position: 'absolute', top: '20%', right: '40px',
           display: 'flex', flexDirection: 'column', gap: '12px', opacity: 0.4,
@@ -118,6 +224,7 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Headline */}
           <h1 style={{
             fontSize: '42px', fontWeight: 800, color: 'white',
             lineHeight: 1.15, marginBottom: '20px',
@@ -127,8 +234,7 @@ export default function LoginPage() {
           </h1>
 
           <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.55)', maxWidth: '340px', lineHeight: 1.7 }}>
-            {/* Platform perpustakaan digital dengan sistem gamifikasi. Kelas dengan bacaan terbanyak mendapat badge kehormatan. */}
-            Lorem ipsum dolor sit, amet consectetur adipisicing elit. Ratione dolorem adipisci ipsa aliquam facere sunt.
+            Platform perpustakaan digital dengan sistem gamifikasi. Kelas dengan bacaan terbanyak mendapat badge kehormatan.
           </p>
 
           {/* Stats */}
@@ -147,6 +253,7 @@ export default function LoginPage() {
         </div>
       </div>
 
+      {/* Login form */}
       <div style={{
         width: '480px',
         flexShrink: 0,
@@ -164,6 +271,7 @@ export default function LoginPage() {
             Pilih tipe akun dan masukkan kredensial kamu
           </p>
 
+          {/* Toggle lgin*/}
           <div style={{
             display: 'flex', gap: '0',
             background: 'var(--bg-light)',
@@ -307,6 +415,7 @@ export default function LoginPage() {
             </p>
           )}
 
+          {/* footer */}
           <div style={{
             marginTop: '40px', paddingTop: '24px',
             borderTop: '1px solid var(--border-light)',
@@ -325,6 +434,25 @@ export default function LoginPage() {
       <style>{`
         @media (max-width: 768px) {
           .login-left-panel { display: none !important; }
+        }
+
+        .splash-logo {
+          position: relative;
+          display: inline-block;
+          bottom: -20px;
+          opacity: 0;
+        }
+
+        .splash-logo.splash-active {
+          bottom: 0;
+          opacity: 1;
+          transition: ease-in-out 0.5s;
+        }
+
+        .splash-logo.splash-fade {
+          bottom: 150px;
+          opacity: 0;
+          transition: ease-in-out 0.5s;
         }
       `}</style>
     </div>

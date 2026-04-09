@@ -431,24 +431,33 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <style>{`
+       <style>{`
+        /* Desktop: panel kiri tampil, panel kanan lebar fixed */
+        .login-left-panel { display: flex !important; }
+        .login-right-panel { width: 480px !important; }
+ 
+        /* Mobile: sembunyikan panel kiri, form full width */
         @media (max-width: 768px) {
           .login-left-panel { display: none !important; }
+          .login-right-panel {
+            width: 100vw !important;
+            min-height: 100vh;
+            padding: 32px 24px !important;
+          }
         }
-
+ 
+        /* Splash logo animasi */
         .splash-logo {
           position: relative;
           display: inline-block;
           bottom: -20px;
           opacity: 0;
         }
-
         .splash-logo.splash-active {
           bottom: 0;
           opacity: 1;
           transition: ease-in-out 0.5s;
         }
-
         .splash-logo.splash-fade {
           bottom: 150px;
           opacity: 0;

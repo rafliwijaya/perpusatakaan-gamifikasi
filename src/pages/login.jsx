@@ -118,8 +118,8 @@ export default function LoginPage() {
           ref={introRef}
           style={{
             position: 'fixed', zIndex: 9999,
-            left: 0, top: 0,
-            width: '100%', height: '100vh',
+            left: 0, top: 0, right: 0, bottom: 0,
+            width: '100%', height: '100dvh',
             background: '#6ab818',
             transition: 'left 1s ease',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -249,7 +249,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div style={{
+      <div className='login-right-panel' style={{
         width: '480px',
         flexShrink: 0,
         display: 'flex',
@@ -432,11 +432,9 @@ export default function LoginPage() {
       </div>
 
        <style>{`
-        /* Desktop: panel kiri tampil, panel kanan lebar fixed */
         .login-left-panel { display: flex !important; }
         .login-right-panel { width: 480px !important; }
  
-        /* Mobile: sembunyikan panel kiri, form full width */
         @media (max-width: 768px) {
           .login-left-panel { display: none !important; }
           .login-right-panel {
@@ -452,6 +450,7 @@ export default function LoginPage() {
           display: inline-block;
           bottom: -20px;
           opacity: 0;
+          font-size: 70%;
         }
         .splash-logo.splash-active {
           bottom: 0;

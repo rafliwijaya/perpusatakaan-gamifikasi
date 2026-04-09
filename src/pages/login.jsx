@@ -4,6 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { BookOpen, User, Lock, Eye, EyeOff, Shield, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
+import lottie from 'lottie-web'
+import { defineElement } from 'lord-icon-element'
+
+defineElement(lottie.loadAnimation)
 
 export default function LoginPage() {
   const { signIn } = useAuth()
@@ -24,14 +28,12 @@ export default function LoginPage() {
   useEffect(() => {
     const spans = logoSpanRefs.current
 
-    // Munculkan teks satu per satu
     spans.forEach((span, idx) => {
       setTimeout(() => {
         if (span) span.classList.add('splash-active')
       }, (idx + 1) * 400)
     })
 
-    // Fade out teks
     setTimeout(() => {
       spans.forEach((span, idx) => {
         setTimeout(() => {
@@ -43,7 +45,6 @@ export default function LoginPage() {
       })
     }, 2000)
 
-    // Slide up bg-second
     setTimeout(() => {
       if (bgSecondRef.current) {
         bgSecondRef.current.style.left = '100vw'
@@ -51,14 +52,12 @@ export default function LoginPage() {
       }
     }, 1700)
 
-    // Slide up intro
     setTimeout(() => {
       if (introRef.current) {
         introRef.current.style.left = '100vw'
       }
     }, 2300)
 
-    // Hapus splash dari DOM
     setTimeout(() => {
       setSplashDone(true)
     }, 3400)
@@ -114,8 +113,6 @@ export default function LoginPage() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-light)' }}>
-
-      {/* ── SPLASH SCREEN ── */}
       {!splashDone && (
         <div
           ref={introRef}
@@ -128,7 +125,6 @@ export default function LoginPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          {/* bg-second layer */}
           <div
             ref={bgSecondRef}
             style={{
@@ -140,8 +136,6 @@ export default function LoginPage() {
               transition: 'left 2.2s ease-in-out, opacity 10s ease-in-out',
             }}
           />
-
-          {/* Teks splash */}
           <h1 style={{
             position: 'absolute',
             top: '40%', left: '50%',
@@ -157,7 +151,15 @@ export default function LoginPage() {
               ref={el => logoSpanRefs.current[0] = el}
               className="splash-logo"
             >
-              Perpustakaan{' '}
+              
+
+                <lord-icon
+                  src="https://cdn.lordicon.com/ftasfhkn.json"
+                  trigger="loop"
+                  delay="1000"
+                  colors="primary:#1a1f0e"
+                  style={{ width: '50px', height: '50px', verticalAlign: 'middle' }}>
+                </lord-icon>Perpustakaan{' '}
             </span>
             <span
               ref={el => logoSpanRefs.current[1] = el}
@@ -168,8 +170,7 @@ export default function LoginPage() {
           </h1>
         </div>
       )}
-      {/* ── END SPLASH SCREEN ── */}
-      {/* left panell*/}
+
       <div style={{
         flex: 1,
         background: 'linear-gradient(135deg, #1a1f0e 0%, #2d3a14 50%, #3d5019 100%)',
@@ -180,7 +181,6 @@ export default function LoginPage() {
         position: 'relative',
         overflow: 'hidden',
       }} className="login-left-panel">
-        {/* Background decoration */}
         <div style={{
           position: 'absolute', top: '-80px', right: '-80px',
           width: '400px', height: '400px',
@@ -194,21 +194,19 @@ export default function LoginPage() {
           borderRadius: '50%',
         }} />
 
-        {/* Floaatng book */}
         <div style={{
           position: 'absolute', top: '20%', right: '40px',
           display: 'flex', flexDirection: 'column', gap: '12px', opacity: 0.4,
         }}>
-          {['#87DB20','#6ab818','#a8e84d'].map((c,i) => (
+          {['#87DB20', '#6ab818', '#a8e84d'].map((c, i) => (
             <div key={i} style={{
-              width: `${70 - i*10}px`, height: '8px',
+              width: `${70 - i * 10}px`, height: '8px',
               background: c, borderRadius: '4px',
             }} />
           ))}
         </div>
 
         <div style={{ position: 'relative', zIndex: 1 }}>
-          {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '48px' }}>
             <div style={{
               width: '52px', height: '52px',
@@ -224,7 +222,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Headline */}
           <h1 style={{
             fontSize: '42px', fontWeight: 800, color: 'white',
             lineHeight: 1.15, marginBottom: '20px',
@@ -237,7 +234,6 @@ export default function LoginPage() {
             Platform perpustakaan digital dengan sistem gamifikasi. Kelas dengan bacaan terbanyak mendapat badge kehormatan.
           </p>
 
-          {/* Stats */}
           <div style={{ display: 'flex', gap: '32px', marginTop: '48px' }}>
             {[
               { label: 'Buku Tersedia', val: '1,200+' },
@@ -253,7 +249,6 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Login form */}
       <div style={{
         width: '480px',
         flexShrink: 0,
@@ -264,6 +259,14 @@ export default function LoginPage() {
         background: 'white',
       }}>
         <div style={{ width: '100%', maxWidth: '380px', animation: 'fadeIn 0.4s ease' }}>
+          <lord-icon
+            src="https://cdn.lordicon.com/kdduutpw.json"
+            trigger="loop"
+            delay="2000"
+            colors="primary:#6ab818,secondary:#1a1f0e"
+            style={{ width: '80px', height: '80px', marginBottom: '16px' }}>
+          </lord-icon>
+
           <h2 style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
             Selamat Datang
           </h2>
@@ -271,7 +274,6 @@ export default function LoginPage() {
             Pilih tipe akun dan masukkan kredensial kamu
           </p>
 
-          {/* Toggle lgin*/}
           <div style={{
             display: 'flex', gap: '0',
             background: 'var(--bg-light)',
@@ -308,7 +310,6 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit}>
             {loginType === 'student' ? (
               <div style={{ marginBottom: '16px' }}>
@@ -415,7 +416,6 @@ export default function LoginPage() {
             </p>
           )}
 
-          {/* footer */}
           <div style={{
             marginTop: '40px', paddingTop: '24px',
             borderTop: '1px solid var(--border-light)',

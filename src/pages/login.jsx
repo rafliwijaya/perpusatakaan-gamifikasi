@@ -268,7 +268,7 @@ export default function LoginPage() {
           </lord-icon>
 
           <h2 style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
-            Selamat Datang
+            Selamat <span style={{color:'#87DB20'}}>Datang</span>
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '32px' }}>
             Pilih tipe akun dan masukkan kredensial kamu
@@ -442,6 +442,10 @@ export default function LoginPage() {
             min-height: 100vh;
             padding: 32px 24px !important;
           }
+
+          .splash-logo {
+          font-size: 70%;
+          }
         }
  
         /* Splash logo animasi */
@@ -450,7 +454,6 @@ export default function LoginPage() {
           display: inline-block;
           bottom: -20px;
           opacity: 0;
-          font-size: 70%;
         }
         .splash-logo.splash-active {
           bottom: 0;

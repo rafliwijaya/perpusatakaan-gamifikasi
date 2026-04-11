@@ -1,31 +1,30 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/authcontext'
 
-// pages
-import LoginPage from './pages/LoginPage'
+// Pages
+import LoginPage from './pages/login'
+import AdminDashboard from './pages/admin/admindashboard'
+import AdminBooks from './pages/admin/adminbooks'
+import AdminTransactions from './pages/admin/admintrasactions'
+import AdminStudents from './pages/admin/adminstudent'
+import AdminReports from './pages/admin/adminreport'
+import AdminLeaderboard from './pages/admin/adminleaderboard'
 
-// Admin
-import AdminLayout from './components/admin/AdminLayout'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminBooks from './pages/admin/AdminBooks'
-import AdminTransactions from './pages/admin/AdminTransactions'
-import AdminStudents from './pages/admin/AdminStudents'
-import AdminReports from './pages/admin/AdminReports'
-import AdminLeaderboard from './pages/admin/AdminLeaderboard'
+import StudentHome from './pages/student/studenthome'
+import StudentBorrow from './pages/student/studentborrow'
+import StudentHistory from './pages/student/studenthistory'
+import StudentProfile from './pages/student/studentprofil'
 
-// Student
-import StudentLayout from './components/student/StudentLayout'
-import StudentHome from './pages/student/StudentHome'
-import StudentBorrow from './pages/student/StudentBorrow'
-import StudentHistory from './pages/student/StudentHistory'
-import StudentProfile from './pages/student/StudentProfile'
+// Layouts
+import AdminLayout from './components/admin/adminlayout'
+import StudentLayout from './components/student/studentlayout'
 
 // Guru
-import GuruLayout from './components/guru/GuruLayout'
-import GuruHome from './pages/guru/GuruHome'
-import GuruHistory from './pages/guru/GuruHistory'
-import GuruProfile from './pages/guru/GuruProfile'
+import GuruLayout from './components/guru/gurulayout'
+import GuruHome from './pages/guru/guruhome'
+import GuruHistory from './pages/guru/guruhistory'
+import GuruProfile from './pages/guru/guruprofile'
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, isAdmin, isStudent, isGuru, loading } = useAuth()

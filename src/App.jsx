@@ -1,74 +1,76 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from './context/authcontext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
-// Pages
-import LoginPage from './pages/login'
-import AdminDashboard from './pages/admin/admindashboard'
-import AdminBooks from './pages/admin/adminbooks'
-import AdminTransactions from './pages/admin/admintrasactions'
-import AdminStudents from './pages/admin/adminstudent'
-import AdminReports from './pages/admin/adminreport'
-import AdminLeaderboard from './pages/admin/adminleaderboard'
+// pages
+import LoginPage from './pages/LoginPage'
 
-import StudentHome from './pages/student/studenthome'
-import StudentBorrow from './pages/student/studentborrow'
-import StudentHistory from './pages/student/studenthistory'
-import StudentProfile from './pages/student/studentprofil'
+// Admin
+import AdminLayout from './components/admin/AdminLayout'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminBooks from './pages/admin/AdminBooks'
+import AdminTransactions from './pages/admin/AdminTransactions'
+import AdminStudents from './pages/admin/AdminStudents'
+import AdminReports from './pages/admin/AdminReports'
+import AdminLeaderboard from './pages/admin/AdminLeaderboard'
 
-// Layouts
-import AdminLayout from './components/admin/adminlayout'
-import StudentLayout from './components/student/studentlayout'
+// Student
+import StudentLayout from './components/student/StudentLayout'
+import StudentHome from './pages/student/StudentHome'
+import StudentBorrow from './pages/student/StudentBorrow'
+import StudentHistory from './pages/student/StudentHistory'
+import StudentProfile from './pages/student/StudentProfile'
 
-function ProtectedRoute({ children, requiredRole }) {
-  const { user, isAdmin, isStudent, loading } = useAuth()
+// Guru
+import GuruLayout from './components/guru/GuruLayout'
+import GuruHome from './pages/guru/GuruHome'
+import GuruHistory from './pages/guru/GuruHistory'
+import GuruProfile from './pages/guru/GuruProfile'
 
-  if (loading) {
-    return (
-      <div className="page-loader">
-        <div className="spinner" />
-      </div>
-    )
-  }
+function ProtectedRoute({ children, allowedRoles }) {
+  const { user, isAdmin, isStudent, isGuru, loading } = useAuth()
+
+  if (loading) return (
+    <div className="page-loader"><div className="spinner" /></div>
+  )
 
   if (!user) return <Navigate to="/login" replace />
 
-  if (requiredRole === 'admin' && !isAdmin) {
-    return <Navigate to="/home" replace />
+  if (allowedRoles.includes('admin') && !isAdmin) {
+    return <Navigate to={isGuru ? '/guru' : '/home'} replace />
   }
-  if (requiredRole === 'student' && !isStudent) {
-    return <Navigate to="/admin" replace />
+  if (allowedRoles.includes('student') && !isStudent) {
+    return <Navigate to={isAdmin ? '/admin' : isGuru ? '/guru' : '/login'} replace />
+  }
+  if (allowedRoles.includes('guru') && !isGuru) {
+    return <Navigate to={isAdmin ? '/admin' : isStudent ? '/home' : '/login'} replace />
   }
 
   return children
 }
 
 function RootRedirect() {
-  const { user, isAdmin, loading } = useAuth()
+  const { user, isAdmin, isGuru, loading } = useAuth()
 
   if (loading) return (
-    <div className="page-loader">
-      <div className="spinner" />
-    </div>
+    <div className="page-loader"><div className="spinner" /></div>
   )
 
   if (!user) return <Navigate to="/login" replace />
   if (isAdmin) return <Navigate to="/admin" replace />
+  if (isGuru) return <Navigate to="/guru" replace />
   return <Navigate to="/home" replace />
 }
 
 function AppRoutes() {
   return (
     <Routes>
-      {/* Root */}
       <Route path="/" element={<RootRedirect />} />
-
-      {/* Login */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Admin Routes */}
+      {/* Admin */}
       <Route path="/admin" element={
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute allowedRoles={['admin']}>
           <AdminLayout />
         </ProtectedRoute>
       }>
@@ -80,9 +82,9 @@ function AppRoutes() {
         <Route path="leaderboard" element={<AdminLeaderboard />} />
       </Route>
 
-      {/* Student Routes */}
+      {/* Student */}
       <Route path="/home" element={
-        <ProtectedRoute requiredRole="student">
+        <ProtectedRoute allowedRoles={['student']}>
           <StudentLayout />
         </ProtectedRoute>
       }>
@@ -92,7 +94,17 @@ function AppRoutes() {
         <Route path="profile" element={<StudentProfile />} />
       </Route>
 
-      {/* Catch all */}
+      {/* Guru */}
+      <Route path="/guru" element={
+        <ProtectedRoute allowedRoles={['guru']}>
+          <GuruLayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<GuruHome />} />
+        <Route path="history" element={<GuruHistory />} />
+        <Route path="profile" element={<GuruProfile />} />
+      </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
@@ -113,9 +125,7 @@ export default function App() {
               border: '1px solid #e8edf0',
               boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
             },
-            success: {
-              iconTheme: { primary: '#87DB20', secondary: '#fff' }
-            }
+            success: { iconTheme: { primary: '#87DB20', secondary: '#fff' } }
           }}
         />
       </AuthProvider>

@@ -122,7 +122,7 @@ export default function StudentProfile() {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Statsitik grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Total Poin', val: stats.totalPoints, icon: Star, color: '#f59e0b', bg: '#fffbeb' },

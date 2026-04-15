@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/authcontext'
 import { Users, Trophy, TrendingUp, Crown, Medal, Star, BookOpen } from 'lucide-react'
 import { Bar, Line } from 'react-chartjs-2'
 import {

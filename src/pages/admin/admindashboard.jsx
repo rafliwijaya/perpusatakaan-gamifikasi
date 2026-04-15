@@ -40,7 +40,7 @@ export default function AdminDashboard() {
         supabase.from('transactions')
           .select('*, books(title, author), students(name, nis), classes(name)')
           .order('created_at', { ascending: false })
-          .limit(6),
+          .limit(10),
         supabase.from('transactions')
           .select('class_id, classes(name)')
           .eq('status', 'returned')
@@ -150,7 +150,6 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      {/* Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {statCards.map((s, i) => (
           <div key={i} className="card" style={{ padding: '20px' }}>
@@ -173,7 +172,6 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* Charts Row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', marginBottom: '24px' }} className="charts-grid">
         {/* Bar Chart */}
         <div className="card" style={{ padding: '24px' }}>
@@ -192,7 +190,6 @@ export default function AdminDashboard() {
           <Bar data={barData} options={barOptions} />
         </div>
 
-        {/* Donut Chart */}
         <div className="card" style={{ padding: '24px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>Peminjaman per Kelas</h3>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Bulan ini</p>
@@ -240,7 +237,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Recent Transactions */}
+{/* transaksi terbaru */}
       <div className="card">
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>

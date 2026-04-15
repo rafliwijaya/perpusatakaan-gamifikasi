@@ -7,7 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [role, setRole] = useState(null) //  | 'superadmin' | 'guru' | 'student'
+  const [role, setRole] = useState(null)
   const fetchingRef = useRef(false)
 
   useEffect(() => {
@@ -22,10 +22,13 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
+        fetchingRef.current = false
         setUser(null); setProfile(null); setRole(null); setLoading(false)
         return
       }
-      if (session?.user) {
+      // Reset fetchingRef setiap SIGNED_IN agar bisa fetch ulang
+      if (event === 'SIGNED_IN' && session?.user) {
+        fetchingRef.current = false
         setUser(session.user)
         fetchProfile(session.user)
       }
@@ -37,14 +40,17 @@ export function AuthProvider({ children }) {
   const fetchProfile = async (authUser) => {
     if (fetchingRef.current) return
     fetchingRef.current = true
+    setLoading(true)
 
     try {
       // 1. Cek tabel admins
-      const { data: adminData } = await supabase
+      const { data: adminData, error: adminErr } = await supabase
         .from('admins')
         .select('id, name, email, role')
         .eq('auth_id', authUser.id)
         .maybeSingle()
+
+      if (adminErr) console.warn('admins query error:', adminErr.message)
 
       if (adminData) {
         setRole(adminData.role)
@@ -52,39 +58,71 @@ export function AuthProvider({ children }) {
         return
       }
 
-      // 2. Cek tabel teachers
-      const { data: teacherData } = await supabase
+      // 2. Cek tabel teachers — query sederhana tanpa relasi kompleks
+      const { data: teacherData, error: teacherErr } = await supabase
         .from('teachers')
-        .select('id, name, nip, role, classes(id, name)')
+        .select('id, name, nip, role, class_id')
         .eq('auth_id', authUser.id)
         .maybeSingle()
+
+      if (teacherErr) console.warn('teachers query error:', teacherErr.message)
 
       if (teacherData) {
+        // Fetch nama kelas secara terpisah jika ada class_id
+        let kelasData = null
+        if (teacherData.class_id) {
+          const { data: kelas } = await supabase
+            .from('classes')
+            .select('id, name')
+            .eq('id', teacherData.class_id)
+            .maybeSingle()
+          kelasData = kelas
+        }
         setRole('guru')
-        setProfile({ ...teacherData, role: 'guru' })
+        setProfile({ ...teacherData, role: 'guru', classes: kelasData })
         return
       }
 
-      // 3. Cek tabel students
-      const { data: studentData } = await supabase
+      // 3. Cek tabel students — query sederhana tanpa relasi teachers
+      const { data: studentData, error: studentErr } = await supabase
         .from('students')
-        .select('id, name, nis, class_id, auth_id, classes(id, name, teacher_id, teachers(name))')
+        .select('id, name, nis, class_id, auth_id')
         .eq('auth_id', authUser.id)
         .maybeSingle()
 
+      if (studentErr) console.warn('students query error:', studentErr.message)
+
       if (studentData) {
+        // Fetch nama kelas secara terpisah
+        let kelasData = null
+        if (studentData.class_id) {
+          const { data: kelas } = await supabase
+            .from('classes')
+            .select('id, name, teacher')
+            .eq('id', studentData.class_id)
+            .maybeSingle()
+          kelasData = kelas
+        }
         setRole('student')
-        setProfile(studentData)
+        setProfile({ ...studentData, classes: kelasData })
         return
       }
 
-      // 4. Tidak ditemukan — sign out
-      console.warn('User tidak ditemukan:', authUser.id)
+      // 4. Ada error di semua query — jangan sign out, mungkin RLS
+      if (adminErr || teacherErr || studentErr) {
+        console.error('Semua query error, kemungkinan RLS bermasalah')
+        // Biarkan user tetap, jangan sign out
+        return
+      }
+
+      // 5. Benar-benar tidak ditemukan
+      console.warn('User tidak ditemukan di sistem:', authUser.email)
       setUser(null); setProfile(null); setRole(null)
       await supabase.auth.signOut()
 
     } catch (err) {
-      console.error('fetchProfile error:', err.message)
+      console.error('fetchProfile exception:', err.message)
+      // Jangan sign out saat exception — bisa jadi network error
     } finally {
       setLoading(false)
       fetchingRef.current = false
@@ -97,6 +135,7 @@ export function AuthProvider({ children }) {
   }
 
   const signOut = async () => {
+    fetchingRef.current = false
     setUser(null); setProfile(null); setRole(null)
     await supabase.auth.signOut()
   }

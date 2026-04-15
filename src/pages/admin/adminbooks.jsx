@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Plus, Search, Edit2, Trash2, BookOpen, X, Upload, MapPin, Tag } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, BookOpen, X, Upload, MapPin, LibraryBig, Tag } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const emptyBook = {
@@ -24,6 +24,9 @@ export default function AdminBooks() {
   const [total, setTotal] = useState(0)
   const fileRef = useRef()
   const PER_PAGE = 12
+  const [showLocationModal, setShowLocationModal] = useState(false)
+  const [locationForm, setLocationForm] = useState({ aisle: '', rack: '' })
+  const [savingLocation, setSavingLocation] = useState(false)
 
   useEffect(() => { fetchLocations() }, [])
   useEffect(() => { fetchBooks() }, [search, filterCategory, filterStatus, page])
@@ -131,6 +134,27 @@ export default function AdminBooks() {
     fetchBooks()
   }
 
+  const handleSaveLocation = async () => {
+    if (!locationForm.aisle.trim()) return toast.error('Lorong wajib diisi')
+    if (!locationForm.rack.trim()) return toast.error('Rak wajib diisi')
+    setSavingLocation(true)
+    try {
+      const { error } = await supabase.from('locations').insert({
+        aisle: locationForm.aisle.trim(),
+        rack: locationForm.rack.trim(),
+      })
+      if (error) throw error
+      toast.success(`✅ Lokasi ${locationForm.aisle} — ${locationForm.rack} berhasil ditambahkan!`)
+      setShowLocationModal(false)
+      setLocationForm({ aisle: '', rack: '' })
+      fetchLocations()
+    } catch (err) {
+      toast.error('Gagal: ' + err.message)
+    } finally {
+      setSavingLocation(false)
+    }
+  }
+
   const categories = [...new Set(books.map(b => b.category).filter(Boolean))]
   const totalPages = Math.ceil(total / PER_PAGE)
 
@@ -142,9 +166,14 @@ export default function AdminBooks() {
           <h1 style={{ fontSize: '22px', fontWeight: 700 }}>Manajemen Buku</h1>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{total} buku tersedia</p>
         </div>
-        <button className="btn btn-primary" onClick={openAdd}>
-          <Plus size={16} /> Tambah Buku
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn btn-secondary" onClick={() => setShowLocationModal(true)}>
+            <LibraryBig size={16} /> Tambah Lokasi
+          </button>
+          <button className="btn btn-primary" onClick={openAdd}>
+            <Plus size={16} /> Tambah Buku
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -200,13 +229,13 @@ export default function AdminBooks() {
             >
               {/* Cover */}
               <div style={{
-                aspectRatio:'3/4', background: 'var(--primary-pale)',
+                height: '160px', background: 'var(--primary-pale)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 overflow: 'hidden', position: 'relative',
               }}>
                 {book.cover_url ? (
                   <img src={book.cover_url} alt={book.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <BookOpen size={48} color="var(--primary)" strokeWidth={1.5} />
                 )}
@@ -332,7 +361,7 @@ export default function AdminBooks() {
                       onChange={e => handleCoverUpload(e.target.files[0])}
                     />
                     <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                      Format 3:4, JPG, PNG. Maks 2MB
+                      JPG, PNG. Maks 2MB
                     </p>
                   </div>
                 </div>
@@ -383,6 +412,67 @@ export default function AdminBooks() {
                   onClick={handleSave} disabled={saving}
                 >
                   {saving ? 'Menyimpan...' : editBook ? 'Simpan Perubahan' : 'Tambah Buku'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showLocationModal && (
+        <div className="modal-overlay" onClick={() => !savingLocation && setShowLocationModal(false)}>
+          <div className="modal-box" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '17px', fontWeight: 700 }}>Tambah Lokasi Rak</h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Lokasi fisik buku di perpustakaan</p>
+              </div>
+              <button onClick={() => !savingLocation && setShowLocationModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                  Lorong *
+                </label>
+                <input
+                  className="input"
+                  placeholder="Contoh: Lorong A"
+                  value={locationForm.aisle}
+                  onChange={e => setLocationForm(f => ({ ...f, aisle: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                  Rak *
+                </label>
+                <input
+                  className="input"
+                  placeholder="Contoh: Rak 1"
+                  value={locationForm.rack}
+                  onChange={e => setLocationForm(f => ({ ...f, rack: e.target.value }))}
+                />
+              </div>
+
+              {locations.length > 0 && (
+                <div style={{ padding: '12px', background: 'var(--bg-light)', borderRadius: '8px' }}>
+                  <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Lokasi yang sudah ada:</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {locations.map(l => (
+                      <span key={l.id} style={{ fontSize: '11px', padding: '3px 8px', background: 'white', border: '1px solid var(--border)', borderRadius: '20px', color: 'var(--text-secondary)' }}>
+                        {l.aisle} • {l.rack}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowLocationModal(false)} disabled={savingLocation}>
+                  Batal
+                </button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSaveLocation} disabled={savingLocation}>
+                  {savingLocation ? 'Menyimpan...' : 'Tambah Lokasi'}
                 </button>
               </div>
             </div>

@@ -10,7 +10,7 @@ import { defineElement } from 'lord-icon-element'
 defineElement(lottie.loadAnimation)
 
 export default function LoginPage() {
-  const { signIn } = useAuth()
+  const { signIn, role, loading: authLoading } = useAuth()
   const navigate = useNavigate()
 
   const [loginType, setLoginType] = useState('student')
@@ -18,13 +18,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
 
   const introRef = useRef(null)
   const bgSecondRef = useRef(null)
   const logoSpanRefs = useRef([])
 
+  // Splash screen — hanya sekali
   useEffect(() => {
     const spans = logoSpanRefs.current
 
@@ -63,20 +64,27 @@ export default function LoginPage() {
     }, 3400)
   }, [])
 
+  useEffect(() => {
+    if (authLoading) return
+    if (!role) return
+    if (role === 'admin' || role === 'superadmin') navigate('/admin', { replace: true })
+    else if (role === 'guru') navigate('/guru', { replace: true })
+    else if (role === 'student') navigate('/home', { replace: true })
+  }, [role, authLoading])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
-
+    setSubmitting(true)
     try {
       if (loginType === 'student') {
-        await handleStudentLogin()
+        await handleUserLogin()
       } else {
         await handleAdminLogin()
       }
     } catch (err) {
       toast.error('Terjadi kesalahan. Coba lagi.')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
@@ -91,28 +99,30 @@ export default function LoginPage() {
       return
     }
     toast.success('Login berhasil!')
-    navigate('/admin')
   }
 
-  const handleStudentLogin = async () => {
-    const loginEmail = `${nis.trim()}@perpustakaan.sch.id`
+  const handleUserLogin = async () => {
+    const studentEmail = `${nis.trim()}@perpustakaan.sch.id`
+    const { error: studentError } = await signIn(studentEmail, password)
+    if (!studentError) {
+      toast.success('Selamat datang!')
+      return // navigate ditangani useEffect
+    }
 
-    const { error } = await signIn(loginEmail, password)
-    if (error) {
-      if (error.message === 'Invalid login credentials') {
-        toast.error('NIS atau password salah.')
-      } else {
-        toast.error(error.message)
-      }
+    const guruEmail = `${nis.trim()}@guru.perpustakaan.sch.id`
+    const { error: guruError } = await signIn(guruEmail, password)
+    if (!guruError) {
+      toast.success('Selamat datang!')
       return
     }
 
-    toast.success('Selamat datang!')
-    navigate('/home')
+    toast.error('NIS/NIP atau password salah.')
   }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-light)' }}>
+
+      {/* Splash Screen */}
       {!splashDone && (
         <div
           ref={introRef}
@@ -147,93 +157,52 @@ export default function LoginPage() {
             whiteSpace: 'nowrap',
             margin: 0,
           }}>
-            <span
-              ref={el => logoSpanRefs.current[0] = el}
-              className="splash-logo"
-            >
-              
-
-                <lord-icon
-                  src="https://cdn.lordicon.com/ftasfhkn.json"
-                  trigger="loop"
-                  delay="1000"
-                  colors="primary:#1a1f0e"
-                  style={{ width: '50px', height: '50px', verticalAlign: 'middle' }}>
-                </lord-icon>Perpustakaan{' '}
+            <span ref={el => logoSpanRefs.current[0] = el} className="splash-logo">
+              <lord-icon
+                src="https://cdn.lordicon.com/ftasfhkn.json"
+                trigger="loop"
+                delay="1000"
+                colors="primary:#1a1f0e"
+                style={{ width: '50px', height: '50px', verticalAlign: 'middle' }}>
+              </lord-icon>Perpustakaan{' '}
             </span>
-            <span
-              ref={el => logoSpanRefs.current[1] = el}
-              className="splash-logo"
-            >
+            <span ref={el => logoSpanRefs.current[1] = el} className="splash-logo">
               <span style={{ color: 'var(--primary)' }}>Digital.</span>
             </span>
           </h1>
         </div>
       )}
 
+      {/* Panel Kiri */}
       <div style={{
         flex: 1,
         background: 'linear-gradient(135deg, #1a1f0e 0%, #2d3a14 50%, #3d5019 100%)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        padding: '60px',
-        position: 'relative',
-        overflow: 'hidden',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        padding: '60px', position: 'relative', overflow: 'hidden',
       }} className="login-left-panel">
-        <div style={{
-          position: 'absolute', top: '-80px', right: '-80px',
-          width: '400px', height: '400px',
-          background: 'rgba(135,219,32,0.08)',
-          borderRadius: '50%',
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '-100px', left: '-60px',
-          width: '300px', height: '300px',
-          background: 'rgba(135,219,32,0.05)',
-          borderRadius: '50%',
-        }} />
-
-        <div style={{
-          position: 'absolute', top: '20%', right: '40px',
-          display: 'flex', flexDirection: 'column', gap: '12px', opacity: 0.4,
-        }}>
+        <div style={{ position: 'absolute', top: '-80px', right: '-80px', width: '400px', height: '400px', background: 'rgba(135,219,32,0.08)', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', bottom: '-100px', left: '-60px', width: '300px', height: '300px', background: 'rgba(135,219,32,0.05)', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', top: '20%', right: '40px', display: 'flex', flexDirection: 'column', gap: '12px', opacity: 0.4 }}>
           {['#87DB20', '#6ab818', '#a8e84d'].map((c, i) => (
-            <div key={i} style={{
-              width: `${70 - i * 10}px`, height: '8px',
-              background: c, borderRadius: '4px',
-            }} />
+            <div key={i} style={{ width: `${70 - i * 10}px`, height: '8px', background: c, borderRadius: '4px' }} />
           ))}
         </div>
-
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '48px' }}>
-            <div style={{
-              width: '52px', height: '52px',
-              background: 'var(--primary)',
-              borderRadius: '14px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
+            <div style={{ width: '52px', height: '52px', background: 'var(--primary)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <BookOpen size={28} color="#1a1f0e" strokeWidth={2.5} />
             </div>
             <div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: 'white' }}>Perpustakaan</div>
+              <div style={{ fontSize: '18px', color: 'white', fontWeight: 700 }}>Perpustakaan</div>
               <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '-2px' }}>Digital School Library</div>
             </div>
           </div>
-
-          <h1 style={{
-            fontSize: '42px', fontWeight: 800, color: 'white',
-            lineHeight: 1.15, marginBottom: '20px',
-          }}>
-            Baca Lebih<br />
-            <span style={{ color: 'var(--primary)' }}>Raih Lebih</span>
+          <h1 style={{ fontSize: '42px', fontWeight: 800, color: 'white', lineHeight: 1.15, marginBottom: '20px' }}>
+            Baca Lebih<br /><span style={{ color: 'var(--primary)' }}>Raih Lebih</span>
           </h1>
-
           <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.55)', maxWidth: '340px', lineHeight: 1.7 }}>
             Platform perpustakaan digital dengan sistem gamifikasi. Kelas dengan bacaan terbanyak mendapat badge kehormatan.
           </p>
-
           <div style={{ display: 'flex', gap: '32px', marginTop: '48px' }}>
             {[
               { label: 'Buku Tersedia', val: '1,200+' },
@@ -249,91 +218,64 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className='login-right-panel' style={{
-        width: '480px',
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px',
-        background: 'white',
+      {/* Panel Kanan */}
+      <div className="login-right-panel" style={{
+        width: '480px', flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '40px', background: 'white',
       }}>
         <div style={{ width: '100%', maxWidth: '380px', animation: 'fadeIn 0.4s ease' }}>
           <lord-icon
             src="https://cdn.lordicon.com/kdduutpw.json"
-            trigger="loop"
-            delay="2000"
+            trigger="loop" delay="2000"
             colors="primary:#6ab818,secondary:#1a1f0e"
             style={{ width: '80px', height: '80px', marginBottom: '16px' }}>
           </lord-icon>
 
           <h2 style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
-            Selamat <span style={{color:'#87DB20'}}>Datang</span>
+            Selamat <span style={{ color: '#87DB20' }}>Datang</span>
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '32px' }}>
             Pilih tipe akun dan masukkan kredensial kamu
           </p>
 
-          <div style={{
-            display: 'flex', gap: '0',
-            background: 'var(--bg-light)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '4px',
-            marginBottom: '28px',
-          }}>
+          {/* Toggle */}
+          <div style={{ display: 'flex', background: 'var(--bg-light)', borderRadius: 'var(--radius-sm)', padding: '4px', marginBottom: '28px' }}>
             {[
-              { id: 'student', label: 'Siswa', icon: User },
+              { id: 'student', label: 'Pengguna', icon: User },
               { id: 'admin', label: 'Admin', icon: Shield },
             ].map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setLoginType(id)}
-                style={{
-                  flex: 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontFamily: 'Poppins, sans-serif',
-                  fontSize: '13px',
-                  fontWeight: loginType === id ? 600 : 500,
-                  background: loginType === id ? 'white' : 'transparent',
-                  color: loginType === id ? 'var(--text-primary)' : 'var(--text-muted)',
-                  boxShadow: loginType === id ? 'var(--shadow-sm)' : 'none',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <Icon size={15} />
-                {label}
+              <button key={id} onClick={() => setLoginType(id)} style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+                padding: '10px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                fontFamily: 'Poppins, sans-serif', fontSize: '13px',
+                fontWeight: loginType === id ? 600 : 500,
+                background: loginType === id ? 'white' : 'transparent',
+                color: loginType === id ? 'var(--text-primary)' : 'var(--text-muted)',
+                boxShadow: loginType === id ? 'var(--shadow-sm)' : 'none',
+                transition: 'all 0.2s ease',
+              }}>
+                <Icon size={15} />{label}
               </button>
             ))}
           </div>
 
+          {/* Form */}
           <form onSubmit={handleSubmit}>
             {loginType === 'student' ? (
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                  NIS (Nomor Induk Siswa)
+                  NIS / NIP
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <User size={16} style={{
-                    position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
-                    color: 'var(--text-muted)',
-                  }} />
+                  <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                   <input
-                    className="input"
-                    style={{ paddingLeft: '42px' }}
-                    type="text"
-                    placeholder="Masukkan NIS kamu"
-                    value={nis}
-                    onChange={(e) => setNis(e.target.value)}
-                    required
+                    className="input" style={{ paddingLeft: '42px' }}
+                    type="text" placeholder="NIS (siswa) atau NIP (guru)"
+                    value={nis} onChange={(e) => setNis(e.target.value)} required
                   />
                 </div>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Contoh: 2024001
-                </p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Siswa: NIS · Guru: NIP</p>
               </div>
             ) : (
               <div style={{ marginBottom: '16px' }}>
@@ -341,70 +283,43 @@ export default function LoginPage() {
                   Email Admin
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <Shield size={16} style={{
-                    position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
-                    color: 'var(--text-muted)',
-                  }} />
+                  <Shield size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                   <input
-                    className="input"
-                    style={{ paddingLeft: '42px' }}
-                    type="email"
-                    placeholder="admin@perpustakaan.sch.id"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
+                    className="input" style={{ paddingLeft: '42px' }}
+                    type="email" placeholder="admin@perpustakaan.sch.id"
+                    value={email} onChange={(e) => setEmail(e.target.value)} required
                   />
                 </div>
               </div>
             )}
 
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                Password
-              </label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Password</label>
               <div style={{ position: 'relative' }}>
-                <Lock size={16} style={{
-                  position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
-                  color: 'var(--text-muted)',
-                }} />
+                <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
-                  className="input"
-                  style={{ paddingLeft: '42px', paddingRight: '44px' }}
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Masukkan password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  className="input" style={{ paddingLeft: '42px', paddingRight: '44px' }}
+                  type={showPassword ? 'text' : 'password'} placeholder="Masukkan password"
+                  value={password} onChange={(e) => setPassword(e.target.value)} required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--text-muted)', padding: '4px',
-                  }}
-                >
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{
+                  position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px',
+                }}>
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="btn btn-primary btn-lg"
-              disabled={loading}
-              style={{ width: '100%', justifyContent: 'center' }}
-            >
-              {loading ? (
+            <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}
+              style={{ width: '100%', justifyContent: 'center' }}>
+              {submitting ? (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
-                  Masuk...
+                  <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />Masuk...
                 </span>
               ) : (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  Masuk
-                  <ChevronRight size={17} />
+                  Masuk<ChevronRight size={17} />
                 </span>
               )}
             </button>
@@ -416,11 +331,7 @@ export default function LoginPage() {
             </p>
           )}
 
-          <div style={{
-            marginTop: '40px', paddingTop: '24px',
-            borderTop: '1px solid var(--border-light)',
-            display: 'flex', alignItems: 'center', gap: '8px',
-          }}>
+          <div style={{ marginTop: '40px', paddingTop: '24px', borderTop: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)' }} />
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary-light)', opacity: 0.6 }} />
             <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--primary-pale)', opacity: 0.8 }} />
@@ -431,10 +342,11 @@ export default function LoginPage() {
         </div>
       </div>
 
-       <style>{`
+      {/* CSS — splash tidak diubah */}
+      <style>{`
         .login-left-panel { display: flex !important; }
         .login-right-panel { width: 480px !important; }
- 
+
         @media (max-width: 768px) {
           .login-left-panel { display: none !important; }
           .login-right-panel {
@@ -442,13 +354,9 @@ export default function LoginPage() {
             min-height: 100vh;
             padding: 32px 24px !important;
           }
-
-          .splash-logo {
-          font-size: 70%;
-          }
+          .splash-logo { font-size: 70%; }
         }
- 
-        /* Splash logo animasi */
+
         .splash-logo {
           position: relative;
           display: inline-block;

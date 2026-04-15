@@ -26,7 +26,6 @@ export function AuthProvider({ children }) {
         setUser(null); setProfile(null); setRole(null); setLoading(false)
         return
       }
-      // Reset fetchingRef setiap SIGNED_IN agar bisa fetch ulang
       if (event === 'SIGNED_IN' && session?.user) {
         fetchingRef.current = false
         setUser(session.user)
@@ -43,7 +42,6 @@ export function AuthProvider({ children }) {
     setLoading(true)
 
     try {
-      // 1. Cek tabel admins
       const { data: adminData, error: adminErr } = await supabase
         .from('admins')
         .select('id, name, email, role')
@@ -58,7 +56,6 @@ export function AuthProvider({ children }) {
         return
       }
 
-      // 2. Cek tabel teachers — query sederhana tanpa relasi kompleks
       const { data: teacherData, error: teacherErr } = await supabase
         .from('teachers')
         .select('id, name, nip, role, class_id')
@@ -68,7 +65,6 @@ export function AuthProvider({ children }) {
       if (teacherErr) console.warn('teachers query error:', teacherErr.message)
 
       if (teacherData) {
-        // Fetch nama kelas secara terpisah jika ada class_id
         let kelasData = null
         if (teacherData.class_id) {
           const { data: kelas } = await supabase
@@ -83,7 +79,6 @@ export function AuthProvider({ children }) {
         return
       }
 
-      // 3. Cek tabel students — query sederhana tanpa relasi teachers
       const { data: studentData, error: studentErr } = await supabase
         .from('students')
         .select('id, name, nis, class_id, auth_id')
@@ -93,7 +88,6 @@ export function AuthProvider({ children }) {
       if (studentErr) console.warn('students query error:', studentErr.message)
 
       if (studentData) {
-        // Fetch nama kelas secara terpisah
         let kelasData = null
         if (studentData.class_id) {
           const { data: kelas } = await supabase
@@ -108,21 +102,17 @@ export function AuthProvider({ children }) {
         return
       }
 
-      // 4. Ada error di semua query — jangan sign out, mungkin RLS
       if (adminErr || teacherErr || studentErr) {
         console.error('Semua query error, kemungkinan RLS bermasalah')
-        // Biarkan user tetap, jangan sign out
         return
       }
 
-      // 5. Benar-benar tidak ditemukan
       console.warn('User tidak ditemukan di sistem:', authUser.email)
       setUser(null); setProfile(null); setRole(null)
       await supabase.auth.signOut()
 
     } catch (err) {
       console.error('fetchProfile exception:', err.message)
-      // Jangan sign out saat exception — bisa jadi network error
     } finally {
       setLoading(false)
       fetchingRef.current = false

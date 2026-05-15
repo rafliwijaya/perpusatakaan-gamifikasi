@@ -17,7 +17,10 @@ export default function AdminDashboard() {
   const [monthlyData, setMonthlyData] = useState([])
   const [classProgress, setClassProgress] = useState([])
   const [recentTransactions, setRecentTransactions] = useState([])
+  const [allTransactions, setAllTransactions] = useState([])
+  const [txPage, setTxPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const TX_PER_PAGE = 10
 
   useEffect(() => {
     fetchDashboardData()
@@ -40,7 +43,7 @@ export default function AdminDashboard() {
         supabase.from('transactions')
           .select('*, books(title, author), students(name, nis), classes(name)')
           .order('created_at', { ascending: false })
-          .limit(10),
+          .limit(150),
         supabase.from('transactions')
           .select('class_id, classes(name)')
           .eq('status', 'returned')
@@ -54,7 +57,8 @@ export default function AdminDashboard() {
         overdue: overdueCount || 0,
       })
 
-      setRecentTransactions(recent || [])
+      setAllTransactions(recent || [])
+      setRecentTransactions((recent || []).slice(0, 15))
 
       // Aggregate class reads
       const classMap = {}
@@ -150,6 +154,7 @@ export default function AdminDashboard() {
         </p>
       </div>
 
+      {/* Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {statCards.map((s, i) => (
           <div key={i} className="card" style={{ padding: '20px' }}>
@@ -172,6 +177,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      {/* Charts Row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', marginBottom: '24px' }} className="charts-grid">
         {/* Bar Chart */}
         <div className="card" style={{ padding: '24px' }}>
@@ -190,6 +196,7 @@ export default function AdminDashboard() {
           <Bar data={barData} options={barOptions} />
         </div>
 
+        {/* Donut Chart */}
         <div className="card" style={{ padding: '24px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>Peminjaman per Kelas</h3>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Bulan ini</p>
@@ -237,16 +244,20 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-{/* transaksi terbaru */}
+      {/* Transaksi Terbaru dengan Pagination */}
       <div className="card">
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ fontSize: '15px', fontWeight: 700 }}>Transaksi Terbaru</h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Aktivitas peminjaman terkini</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              {allTransactions.length > 0
+                ? `${Math.min((txPage - 1) * TX_PER_PAGE + 1, allTransactions.length)}–${Math.min(txPage * TX_PER_PAGE, allTransactions.length)} dari ${allTransactions.length} transaksi`
+                : 'Aktivitas peminjaman terkini'}
+            </p>
           </div>
         </div>
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
-          {recentTransactions.length === 0 ? (
+          {allTransactions.length === 0 ? (
             <div className="empty-state">
               <ArrowLeftRight size={32} />
               <h3>Belum ada transaksi</h3>
@@ -263,7 +274,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentTransactions.map(t => (
+                {allTransactions.slice((txPage - 1) * TX_PER_PAGE, txPage * TX_PER_PAGE).map(t => (
                   <tr key={t.id}>
                     <td>
                       <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
@@ -292,6 +303,56 @@ export default function AdminDashboard() {
             </table>
           )}
         </div>
+
+        {/* Pagination — hanya muncul jika lebih dari 15 transaksi */}
+        {allTransactions.length > TX_PER_PAGE && (
+          <div style={{
+            padding: '14px 24px',
+            borderTop: '1px solid var(--border-light)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px',
+          }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              Halaman {txPage} dari {Math.ceil(allTransactions.length / TX_PER_PAGE)}
+            </span>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button
+                onClick={() => setTxPage(p => Math.max(1, p - 1))}
+                disabled={txPage === 1}
+                style={{
+                  padding: '7px 14px', borderRadius: '8px',
+                  border: '1.5px solid var(--border)', background: 'white',
+                  cursor: txPage === 1 ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Poppins, sans-serif', fontSize: '13px', fontWeight: 600,
+                  color: txPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+                  opacity: txPage === 1 ? 0.45 : 1, transition: 'opacity 0.15s',
+                }}
+              >← Prev</button>
+
+              {Array.from({ length: Math.ceil(allTransactions.length / TX_PER_PAGE) }, (_, i) => (
+                <button key={i} onClick={() => setTxPage(i + 1)} style={{
+                  width: '34px', height: '34px', borderRadius: '8px', border: '1.5px solid',
+                  borderColor: txPage === i + 1 ? 'var(--primary)' : 'var(--border)',
+                  background: txPage === i + 1 ? 'var(--primary)' : 'white',
+                  color: txPage === i + 1 ? '#1a1f0e' : 'var(--text-secondary)',
+                  cursor: 'pointer', fontFamily: 'Poppins', fontWeight: 600, fontSize: '13px',
+                }}>{i + 1}</button>
+              ))}
+
+              <button
+                onClick={() => setTxPage(p => Math.min(Math.ceil(allTransactions.length / TX_PER_PAGE), p + 1))}
+                disabled={txPage === Math.ceil(allTransactions.length / TX_PER_PAGE)}
+                style={{
+                  padding: '7px 14px', borderRadius: '8px',
+                  border: '1.5px solid var(--border)', background: 'white',
+                  cursor: txPage === Math.ceil(allTransactions.length / TX_PER_PAGE) ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Poppins, sans-serif', fontSize: '13px', fontWeight: 600,
+                  color: txPage === Math.ceil(allTransactions.length / TX_PER_PAGE) ? 'var(--text-muted)' : 'var(--text-primary)',
+                  opacity: txPage === Math.ceil(allTransactions.length / TX_PER_PAGE) ? 0.45 : 1, transition: 'opacity 0.15s',
+                }}
+              >Next →</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <style>{`

@@ -4,7 +4,7 @@ import { Search, CheckCircle, RotateCcw, AlertTriangle, Clock, Filter } from 'lu
 import toast from 'react-hot-toast'
 import { differenceInDays } from 'date-fns'
 
-const FINE_PER_DAY = 1000
+const FINE_PER_DAY = 1000 // Rp 1.000/hari
 
 export default function AdminTransactions() {
   const [transactions, setTransactions] = useState([])
@@ -15,7 +15,9 @@ export default function AdminTransactions() {
 
   useEffect(() => {
     fetchTransactions()
+    // Auto-expire pending orders > 2 hours
     expirePendingOrders()
+    // Auto-flag late returns
     flagLateReturns()
   }, [filter, search])
 
@@ -86,6 +88,26 @@ export default function AdminTransactions() {
     setProcessingId(t.id)
     try {
       await supabase.from('transactions').update({ status: 'borrowed' }).eq('id', t.id)
+
+      // cek apakah stok habis setelah approve
+      const { data: bookData } = await supabase
+        .from('books')
+        .select('stock')
+        .eq('id', t.book_id)
+        .single()
+
+      if (bookData?.stock > 0) {
+        const { count: activeBorrows } = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('book_id', t.book_id)
+          .in('status', ['borrowed', 'late'])
+
+        if (activeBorrows >= bookData.stock) {
+          await supabase.from('books').update({ status: 'borrowed' }).eq('id', t.book_id)
+        }
+      }
+
       toast.success(`Peminjaman disetujui: ${t.books?.title}`)
       fetchTransactions()
     } catch (err) {
@@ -121,6 +143,7 @@ export default function AdminTransactions() {
 
       await supabase.from('books').update({ status: 'available' }).eq('id', t.book_id)
 
+      // poin award (5 pts ontime, 2 pts trlmabat)
       const points = fine === 0 ? 5 : 2
       await supabase.from('points_log').insert({
         student_id: t.student_id,
@@ -198,7 +221,7 @@ export default function AdminTransactions() {
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>ACC, pengembalian, dan denda buku</p>
       </div>
 
-      {/* Quick Stats */}
+      {/* quick statisks */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {[
           { label: 'Menunggu ACC', val: counts.pending, color: '#f59e0b', bg: '#fffbeb', icon: Clock },
@@ -219,7 +242,7 @@ export default function AdminTransactions() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* filters */}
       <div className="card" style={{ padding: '0', marginBottom: '20px', overflow: 'hidden' }}>
         <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border-light)', overflowX: 'auto' }}>
           {statusTabs.map(tab => (

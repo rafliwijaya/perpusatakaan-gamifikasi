@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Plus, Search, Edit2, Trash2, BookOpen, X, Upload, MapPin, LibraryBig, Tag } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, BookOpen, X, Upload, MapPin, Tag } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const emptyBook = {
   title: '', author: '', category: '', type: 'teks',
-  location_id: '', status: 'available', cover_url: ''
+  location_id: '', status: 'available', cover_url: '', stock: 1
 }
 
 export default function AdminBooks() {
@@ -65,7 +65,7 @@ export default function AdminBooks() {
     setForm({
       title: book.title, author: book.author || '', category: book.category || '',
       type: book.type || 'teks', location_id: book.location_id || '',
-      status: book.status, cover_url: book.cover_url || '',
+      status: book.status, cover_url: book.cover_url || '', stock: book.stock ?? 1,
     })
     setEditBook(book)
     setShowModal(true)
@@ -97,6 +97,7 @@ export default function AdminBooks() {
     if (!form.title.trim()) return toast.error('Judul buku wajib diisi')
     setSaving(true)
     try {
+      const stockVal = parseInt(form.stock) || 0
       const payload = {
         title: form.title.trim(),
         author: form.author.trim() || null,
@@ -105,6 +106,7 @@ export default function AdminBooks() {
         location_id: form.location_id || null,
         status: form.status,
         cover_url: form.cover_url || null,
+        stock: stockVal,
       }
 
       if (editBook) {
@@ -147,7 +149,7 @@ export default function AdminBooks() {
       toast.success(`✅ Lokasi ${locationForm.aisle} — ${locationForm.rack} berhasil ditambahkan!`)
       setShowLocationModal(false)
       setLocationForm({ aisle: '', rack: '' })
-      fetchLocations()
+      fetchLocations() // refresh dropdown lokasi di form buku
     } catch (err) {
       toast.error('Gagal: ' + err.message)
     } finally {
@@ -168,7 +170,7 @@ export default function AdminBooks() {
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-secondary" onClick={() => setShowLocationModal(true)}>
-            <LibraryBig size={16} /> Tambah Lokasi
+            <MapPin size={16} /> Tambah Lokasi
           </button>
           <button className="btn btn-primary" onClick={openAdd}>
             <Plus size={16} /> Tambah Buku
@@ -176,7 +178,7 @@ export default function AdminBooks() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* filters */}
       <div className="card" style={{ padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
           <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -209,7 +211,7 @@ export default function AdminBooks() {
         </select>
       </div>
 
-      {/* Books Grid */}
+      {/* books grid */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '60px' }}>
           <div className="spinner" />
@@ -271,7 +273,23 @@ export default function AdminBooks() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                {/* Stok info */}
+                <div style={{
+                  marginTop: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '6px 10px',
+                  background: book.stock === 0 ? '#fef2f2' : 'var(--primary-pale)',
+                  borderRadius: '8px',
+                }}>
+                  <span style={{ fontSize: '11px', color: book.stock === 0 ? '#ef4444' : 'var(--primary-dark)', fontWeight: 600 }}>
+                    Stok: {book.stock ?? 0}
+                  </span>
+                  <span style={{ fontSize: '10px', color: book.stock === 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                    {book.stock === 0 ? 'Habis' : 'Tersedia'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                   <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => openEdit(book)}>
                     <Edit2 size={12} /> Edit
                   </button>
@@ -393,6 +411,23 @@ export default function AdminBooks() {
               </div>
 
               <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                  Jumlah Stok *
+                </label>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  placeholder="Contoh: 3"
+                  value={form.stock}
+                  onChange={e => setForm(f => ({ ...f, stock: e.target.value }))}
+                />
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Jumlah eksemplar buku yang tersedia
+                </p>
+              </div>
+
+              <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Lokasi Rak</label>
                 <select className="input" value={form.location_id} onChange={e => setForm(f => ({ ...f, location_id: e.target.value }))}>
                   <option value="">Pilih lokasi...</option>
@@ -418,6 +453,7 @@ export default function AdminBooks() {
           </div>
         </div>
       )}
+      {/* modal tambah lokasi */}
       {showLocationModal && (
         <div className="modal-overlay" onClick={() => !savingLocation && setShowLocationModal(false)}>
           <div className="modal-box" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
@@ -454,6 +490,7 @@ export default function AdminBooks() {
                 />
               </div>
 
+              {/* Preview lokasi yang dah ada */}
               {locations.length > 0 && (
                 <div style={{ padding: '12px', background: 'var(--bg-light)', borderRadius: '8px' }}>
                   <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Lokasi yang sudah ada:</p>

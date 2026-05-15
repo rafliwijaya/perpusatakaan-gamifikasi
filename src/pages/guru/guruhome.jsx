@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../context/authcontext'
+import { useAuth } from '../../context/AuthContext'
 import { Search, MapPin, BookOpen, Tag, Filter, X, CheckCircle, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -15,6 +15,7 @@ export default function GuruHome() {
   const [borrowing, setBorrowing] = useState(null)
   const [activeBorrows, setActiveBorrows] = useState([])
   const [hasFine, setHasFine] = useState(false)
+  const [borrowCountPerBook, setBorrowCountPerBook] = useState({})
 
   useEffect(() => {
     fetchBooks()
@@ -52,8 +53,26 @@ export default function GuruHome() {
     if (filterType) query = query.eq('type', filterType)
     query = query.in('status', ['available', 'borrowed']).limit(60)
     const { data, error } = await query
-    if (!error) setBooks(data || [])
+    if (!error) {
+      setBooks(data || [])
+      fetchBorrowCounts(data || [])
+    }
     setLoading(false)
+  }
+
+  const fetchBorrowCounts = async (bookList) => {
+    if (!bookList.length) return
+    const bookIds = bookList.map(b => b.id)
+    const { data } = await supabase
+      .from('transactions')
+      .select('book_id')
+      .in('book_id', bookIds)
+      .in('status', ['borrowed', 'pending', 'late'])
+    const counts = {}
+    ;(data || []).forEach(t => {
+      counts[t.book_id] = (counts[t.book_id] || 0) + 1
+    })
+    setBorrowCountPerBook(counts)
   }
 
   const handleBorrow = async (book) => {
@@ -105,7 +124,7 @@ export default function GuruHome() {
           </p>
           {hasFine && (
             <div style={{ marginTop: '12px', background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '10px', padding: '10px 16px', fontSize: '12px', color: '#fca5a5' }}>
-              ⚠️ Kamu memiliki denda yang belum dibayar. Hubungi admin.
+              Kamu memiliki denda yang belum dibayar. Hubungi admin.
             </div>
           )}
         </div>
@@ -151,7 +170,9 @@ export default function GuruHome() {
           {books.map(book => {
             const pending = isPendingByMe(book)
             const borrowed = isBorrowedByMe(book)
-            const available = book.status === 'available'
+            const activeBorrowCount = borrowCountPerBook[book.id] || 0
+            const stockAvailable = book.stock > 0 ? Math.max(0, book.stock - activeBorrowCount) : null
+            const available = book.status === 'available' && (book.stock === 0 || stockAvailable > 0)
 
             return (
               <div key={book.id} className="card" style={{ overflow: 'hidden', transition: 'transform 0.2s, box-shadow 0.2s', opacity: (!available && !pending && !borrowed) ? 0.72 : 1 }}
@@ -196,13 +217,26 @@ export default function GuruHome() {
                       <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{book.category}</span>
                     </div>
                   )}
+                  {book.stock > 0 && (
+                    <div style={{
+                      marginBottom: '8px',
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '3px 8px',
+                      background: stockAvailable === 0 ? '#fef2f2' : 'var(--primary-pale)',
+                      borderRadius: '20px', fontSize: '10px', fontWeight: 600,
+                      color: stockAvailable === 0 ? '#ef4444' : 'var(--primary-dark)',
+                    }}>
+                      {stockAvailable === 0 ? 'Stok habis' : `Stok: ${stockAvailable}`}
+                    </div>
+                  )}
+
                   <button
                     className={`btn ${available && !pending && !borrowed ? 'btn-primary' : 'btn-secondary'} btn-sm`}
                     style={{ width: '100%', justifyContent: 'center', fontSize: '12px' }}
                     disabled={!available || pending || borrowed || borrowing === book.id || hasFine}
                     onClick={() => handleBorrow(book)}
                   >
-                    {borrowing === book.id ? 'Memproses...' : pending ? '⏳ Menunggu ACC' : borrowed ? '✓ Dipinjam' : !available ? 'Tidak Tersedia' : '📚 Pinjam'}
+                    {borrowing === book.id ? 'Memproses...' : pending ? 'Menunggu ACC' : borrowed ? '✓ Dipinjam' : !available ? 'Tidak Tersedia' : 'Pinjam'}
                   </button>
                 </div>
               </div>

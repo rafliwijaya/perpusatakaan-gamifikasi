@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../context/authcontext'
+import { useAuth } from '../../context/AuthContext'
 import { Search, MapPin, BookOpen, Tag, Filter, X, CheckCircle, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -13,9 +13,10 @@ export default function StudentHome() {
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [categories, setCategories] = useState([])
-  const [borrowing, setBorrowing] = useState(null) // book id dipnjam
-  const [activeBorrows, setActiveBorrows] = useState([]) // pinjaman student satt ini 
+  const [borrowing, setBorrowing] = useState(null)
+  const [activeBorrows, setActiveBorrows] = useState([])
   const [hasFine, setHasFine] = useState(false)
+  const [borrowCountPerBook, setBorrowCountPerBook] = useState({})
 
   useEffect(() => {
     fetchBooks()
@@ -32,6 +33,7 @@ export default function StudentHome() {
   }
 
   const checkStudentStatus = async () => {
+    // Check active borrows
     const { data: borrows } = await supabase
       .from('transactions')
       .select('*')
@@ -40,6 +42,7 @@ export default function StudentHome() {
 
     setActiveBorrows(borrows || [])
 
+    // Check unpaid fines
     const { data: fines } = await supabase
       .from('transactions')
       .select('fine_amount')
@@ -64,8 +67,26 @@ export default function StudentHome() {
     else query = query.in('status', ['available', 'borrowed'])
 
     const { data, error } = await query.limit(60)
-    if (!error) setBooks(data || [])
+    if (!error) {
+      setBooks(data || [])
+      fetchBorrowCounts(data || [])
+    }
     setLoading(false)
+  }
+
+  const fetchBorrowCounts = async (bookList) => {
+    if (!bookList.length) return
+    const bookIds = bookList.map(b => b.id)
+    const { data } = await supabase
+      .from('transactions')
+      .select('book_id')
+      .in('book_id', bookIds)
+      .in('status', ['borrowed', 'pending', 'late'])
+    const counts = {}
+    ;(data || []).forEach(t => {
+      counts[t.book_id] = (counts[t.book_id] || 0) + 1
+    })
+    setBorrowCountPerBook(counts)
   }
 
   const handleBorrow = async (book) => {
@@ -98,6 +119,7 @@ export default function StudentHome() {
 
       if (txError) throw txError
 
+      // Mark book as borrowed
       await supabase.from('books').update({ status: 'borrowed' }).eq('id', book.id)
 
       toast.success(
@@ -124,6 +146,7 @@ export default function StudentHome() {
 
   return (
     <div className="fade-in">
+      {/* Welcome banner */}
       <div style={{
         background: 'linear-gradient(135deg, #1a1f0e 0%, #2d3a14 100%)',
         borderRadius: 'var(--radius-xl)',
@@ -153,7 +176,7 @@ export default function StudentHome() {
               display: 'flex', alignItems: 'center', gap: '8px',
               fontSize: '12px', color: '#fca5a5',
             }}>
-              ⚠️ Kamu memiliki denda yang belum dibayar. Hubungi admin untuk melunasi denda sebelum bisa meminjam lagi.
+              Kamu memiliki denda yang belum dibayar. Hubungi admin untuk melunasi denda sebelum bisa meminjam lagi.
             </div>
           )}
 
@@ -171,6 +194,7 @@ export default function StudentHome() {
         </div>
       </div>
 
+      {/* Search & filter */}
       <div className="card" style={{ padding: '16px', marginBottom: '20px' }}>
         <div style={{ position: 'relative', marginBottom: '12px' }}>
           <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -213,12 +237,14 @@ export default function StudentHome() {
         </div>
       </div>
 
+      {/* hasil hitung */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
           {loading ? 'Memuat...' : `${books.length} buku ditemukan`}
         </p>
       </div>
 
+      {/* B=books grid */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
           <div className="spinner" />
@@ -239,7 +265,9 @@ export default function StudentHome() {
           {books.map(book => {
             const isPendingByMe = isBookPendingByMe(book)
             const isBorrowedByMe = isBookBorrowedByMe(book)
-            const available = book.status === 'available'
+            const activeBorrowCount = borrowCountPerBook[book.id] || 0
+            const stockAvailable = book.stock > 0 ? Math.max(0, book.stock - activeBorrowCount) : null
+            const available = book.status === 'available' && (book.stock === 0 || stockAvailable > 0)
 
             return (
               <div
@@ -260,14 +288,14 @@ export default function StudentHome() {
               >
                 {/* Cover */}
                 <div style={{
-                  aspectRatio:'3/4',
+                  height: '180px',
                   background: 'var(--primary-pale)',
                   position: 'relative',
                   overflow: 'hidden',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   {book.cover_url ? (
-                    <img src={book.cover_url} alt={book.title} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src={book.cover_url} alt={book.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ textAlign: 'center' }}>
                       <BookOpen size={48} color="var(--primary)" strokeWidth={1.5} />
@@ -320,9 +348,22 @@ export default function StudentHome() {
                   )}
 
                   {book.category && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
                       <Tag size={10} color="var(--text-muted)" />
                       <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{book.category}</span>
+                    </div>
+                  )}
+
+                  {book.stock > 0 && (
+                    <div style={{
+                      marginBottom: '8px',
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '3px 8px',
+                      background: stockAvailable === 0 ? '#fef2f2' : 'var(--primary-pale)',
+                      borderRadius: '20px', fontSize: '10px', fontWeight: 600,
+                      color: stockAvailable === 0 ? '#ef4444' : 'var(--primary-dark)',
+                    }}>
+                      {stockAvailable === 0 ? 'Stok habis' : `Stok: ${stockAvailable}`}
                     </div>
                   )}
 
@@ -333,10 +374,10 @@ export default function StudentHome() {
                     onClick={() => handleBorrow(book)}
                   >
                     {borrowing === book.id ? 'Memproses...' :
-                      isPendingByMe ? ' Menunggu ACC' :
+                      isPendingByMe ? 'Menunggu ACC' :
                       isBorrowedByMe ? '✓ Sedang Dipinjam' :
                       !available ? 'Tidak Tersedia' :
-                      ' Pinjam Buku'}
+                      'Pinjam Buku'}
                   </button>
                 </div>
               </div>

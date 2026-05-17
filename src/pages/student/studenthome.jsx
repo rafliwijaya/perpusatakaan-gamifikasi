@@ -33,7 +33,6 @@ export default function StudentHome() {
   }
 
   const checkStudentStatus = async () => {
-    // Check active borrows
     const { data: borrows } = await supabase
       .from('transactions')
       .select('*')
@@ -42,7 +41,6 @@ export default function StudentHome() {
 
     setActiveBorrows(borrows || [])
 
-    // Check unpaid fines
     const { data: fines } = await supabase
       .from('transactions')
       .select('fine_amount')
@@ -119,7 +117,6 @@ export default function StudentHome() {
 
       if (txError) throw txError
 
-      // Mark book as borrowed
       await supabase.from('books').update({ status: 'borrowed' }).eq('id', book.id)
 
       toast.success(
@@ -146,7 +143,7 @@ export default function StudentHome() {
 
   return (
     <div className="fade-in">
-      {/* Welcome banner */}
+      {/* welcome banner */}
       <div style={{
         background: 'linear-gradient(135deg, #1a1f0e 0%, #2d3a14 100%)',
         borderRadius: 'var(--radius-xl)',
@@ -163,7 +160,7 @@ export default function StudentHome() {
             Selamat datang
           </p>
           <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'white', marginBottom: '8px' }}>
-            {profile?.name?.split(' ')[0] || 'Siswa'} 👋
+            {profile?.name?.split(' ')[0] || 'Siswa'}
           </h1>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', marginBottom: '16px' }}>
             Kelas {profile?.classes?.name || '-'} • NIS {profile?.nis}
@@ -375,7 +372,7 @@ export default function StudentHome() {
                   >
                     {borrowing === book.id ? 'Memproses...' :
                       isPendingByMe ? 'Menunggu ACC' :
-                      isBorrowedByMe ? '✓ Sedang Dipinjam' :
+                      isBorrowedByMe ? 'Sedang Dipinjam' :
                       !available ? 'Tidak Tersedia' :
                       'Pinjam Buku'}
                   </button>

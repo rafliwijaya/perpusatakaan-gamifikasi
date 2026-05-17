@@ -117,7 +117,7 @@ export default function GuruHome() {
         <div style={{ position: 'relative', zIndex: 1 }}>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Selamat datang</p>
           <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-            {profile?.name || 'Guru'} 👋
+            {profile?.name || 'Guru'}
           </h1>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
             NIP {profile?.nip} • Wali Kelas {profile?.classes?.name || '-'}
@@ -236,7 +236,7 @@ export default function GuruHome() {
                     disabled={!available || pending || borrowed || borrowing === book.id || hasFine}
                     onClick={() => handleBorrow(book)}
                   >
-                    {borrowing === book.id ? 'Memproses...' : pending ? 'Menunggu ACC' : borrowed ? '✓ Dipinjam' : !available ? 'Tidak Tersedia' : 'Pinjam'}
+                    {borrowing === book.id ? 'Memproses...' : pending ? 'Menunggu ACC' : borrowed ? 'Dipinjam' : !available ? 'Tidak Tersedia' : 'Pinjam'}
                   </button>
                 </div>
               </div>

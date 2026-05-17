@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import {
   BookOpen, Users, ArrowLeftRight, AlertTriangle,
-  TrendingUp, Trophy, Clock, CheckCircle
+  TrendingUp, Trophy, Clock, CheckCircle, GraduationCap
 } from 'lucide-react'
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
@@ -13,7 +13,7 @@ import { Bar, Doughnut } from 'react-chartjs-2'
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, ArcElement)
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ books: 0, students: 0, borrowed: 0, overdue: 0, returned_today: 0 })
+  const [stats, setStats] = useState({ books: 0, students: 0, teachers: 0, borrowed: 0, overdue: 0, returned_today: 0 })
   const [monthlyData, setMonthlyData] = useState([])
   const [classProgress, setClassProgress] = useState([])
   const [recentTransactions, setRecentTransactions] = useState([])
@@ -31,6 +31,7 @@ export default function AdminDashboard() {
       const [
         { count: bookCount },
         { count: studentCount },
+        { count: teachersCount },
         { count: borrowedCount },
         { count: overdueCount },
         { data: recent },
@@ -38,6 +39,7 @@ export default function AdminDashboard() {
       ] = await Promise.all([
         supabase.from('books').select('*', { count: 'exact', head: true }),
         supabase.from('students').select('*', { count: 'exact', head: true }),
+        supabase.from('teachers').select('*', { count: 'exact', head: true }),
         supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'borrowed'),
         supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'late'),
         supabase.from('transactions')
@@ -53,6 +55,7 @@ export default function AdminDashboard() {
       setStats({
         books: bookCount || 0,
         students: studentCount || 0,
+        teachers: teachersCount || 0,
         borrowed: borrowedCount || 0,
         overdue: overdueCount || 0,
       })
@@ -60,7 +63,6 @@ export default function AdminDashboard() {
       setAllTransactions(recent || [])
       setRecentTransactions((recent || []).slice(0, 15))
 
-      // Aggregate class reads
       const classMap = {}
       ;(classData || []).forEach(t => {
         const key = t.class_id
@@ -70,7 +72,7 @@ export default function AdminDashboard() {
       const sorted = Object.values(classMap).sort((a, b) => b.count - a.count)
       setClassProgress(sorted)
 
-      // Monthly data (last 6 months)
+      // Monthly data 6 bln terkahir
       const monthly = []
       for (let i = 5; i >= 0; i--) {
         const d = new Date()
@@ -98,6 +100,7 @@ export default function AdminDashboard() {
   const statCards = [
     { label: 'Total Buku', value: stats.books, icon: BookOpen, color: '#87DB20', bg: '#f0fad9', change: 'Koleksi tersedia' },
     { label: 'Total Siswa', value: stats.students, icon: Users, color: '#3b82f6', bg: '#eff6ff', change: 'Terdaftar' },
+    { label: 'Total Guru', value: stats.teachers, icon: GraduationCap, color: '#f0f63b', bg: '#eff6ff', change: 'Terdaftar' },
     { label: 'Sedang Dipinjam', value: stats.borrowed, icon: ArrowLeftRight, color: '#f59e0b', bg: '#fffbeb', change: 'Aktif' },
     { label: 'Terlambat', value: stats.overdue, icon: AlertTriangle, color: '#ef4444', bg: '#fef2f2', change: 'Perlu tindakan' },
   ]

@@ -93,6 +93,13 @@ export default function StudentHome() {
       return
     }
 
+    // Maks 3 buku aktif
+    const activeBorrowCount = activeBorrows.filter(b => ['borrowed', 'pending', 'late'].includes(b.status)).length
+    if (activeBorrowCount >= 3) {
+      toast.error('Kamu sudah meminjam 3 buku. Kembalikan buku terlebih dahulu sebelum meminjam lagi.', { duration: 4000 })
+      return
+    }
+
     const alreadyBorrowing = activeBorrows.find(b => b.book_id === book.id)
     if (alreadyBorrowing) {
       toast.error('Kamu sudah meminjam atau mengajukan buku ini.')
@@ -143,7 +150,7 @@ export default function StudentHome() {
 
   return (
     <div className="fade-in">
-      {/* welcome banner */}
+      {/* Welcome Banner */}
       <div style={{
         background: 'linear-gradient(135deg, #1a1f0e 0%, #2d3a14 100%)',
         borderRadius: 'var(--radius-xl)',
@@ -160,7 +167,7 @@ export default function StudentHome() {
             Selamat datang
           </p>
           <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'white', marginBottom: '8px' }}>
-            {profile?.name?.split(' ')[0] || 'Siswa'}
+            {profile?.name?.split(' ')[0] || 'Siswa'} 👋
           </h1>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', marginBottom: '16px' }}>
             Kelas {profile?.classes?.name || '-'} • NIS {profile?.nis}
@@ -191,7 +198,7 @@ export default function StudentHome() {
         </div>
       </div>
 
-      {/* Search & filter */}
+      {/* Search & Filters */}
       <div className="card" style={{ padding: '16px', marginBottom: '20px' }}>
         <div style={{ position: 'relative', marginBottom: '12px' }}>
           <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -234,14 +241,14 @@ export default function StudentHome() {
         </div>
       </div>
 
-      {/* hasil hitung */}
+      {/* Results count */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
           {loading ? 'Memuat...' : `${books.length} buku ditemukan`}
         </p>
       </div>
 
-      {/* B=books grid */}
+      {/* Books Grid */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
           <div className="spinner" />

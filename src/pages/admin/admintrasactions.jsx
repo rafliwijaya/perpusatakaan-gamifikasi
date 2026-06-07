@@ -1,10 +1,45 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Search, CheckCircle, RotateCcw, AlertTriangle, Clock, Filter } from 'lucide-react'
+import { Search, CheckCircle, RotateCcw, AlertTriangle, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { differenceInDays } from 'date-fns'
 
 const FINE_PER_DAY = 1000 // Rp 1.000/hari
+
+const CLASS_BADGE_LEVELS = [
+  {
+    min: 5.0001,
+    name: 'Bintang Perpustakaan',
+    emoji: '⭐',
+    color: '#f59e0b',
+    bg: '#fffbeb',
+    border: '#fbbf24',
+  },
+  {
+    min: 2,
+    name: 'Sahabat Buku',
+    emoji: '📚',
+    color: '#6b7280',
+    bg: '#f9fafb',
+    border: '#9ca3af',
+  },
+  {
+    min: 0,
+    name: 'Pemula Membaca',
+    emoji: '🌱',
+    color: '#b45309',
+    bg: '#fef3c7',
+    border: '#d97706',
+  },
+]
+
+function getClassBadge(score) {
+  return CLASS_BADGE_LEVELS.find(b => score >= b.min) || CLASS_BADGE_LEVELS[2]
+}
+
+function formatScore(score) {
+  return Number(score || 0).toFixed(1)
+}
 
 export default function AdminTransactions() {
   const [transactions, setTransactions] = useState([])
@@ -49,7 +84,8 @@ export default function AdminTransactions() {
       for (const t of lateOnes) {
         const daysLate = differenceInDays(new Date(), new Date(t.due_date))
         const fine = daysLate * FINE_PER_DAY
-        await supabase.from('transactions')
+        await supabase
+          .from('transactions')
           .update({ status: 'late', fine_amount: fine })
           .eq('id', t.id)
       }
@@ -143,7 +179,7 @@ export default function AdminTransactions() {
 
       await supabase.from('books').update({ status: 'available' }).eq('id', t.book_id)
 
-      // poin award (5 pts ontime, 2 pts trlmabat)
+      // poin siswa tetap: 5 tepat waktu, 2 terlambat
       const points = fine === 0 ? 5 : 2
       await supabase.from('points_log').insert({
         student_id: t.student_id,
@@ -166,41 +202,81 @@ export default function AdminTransactions() {
   const checkClassBadge = async (classId) => {
     if (!classId) return
 
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-    const { count } = await supabase
-      .from('transactions')
-      .select('*', { count: 'exact', head: true })
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+
+    const [returnedRes, studentsRes] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('class_id', classId)
+        .eq('status', 'returned')
+        .gte('return_date', startOfMonth),
+      supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true })
+        .eq('class_id', classId),
+    ])
+
+    const returnedCount = returnedRes.count || 0
+    const studentCount = studentsRes.count || 0
+    const score = studentCount > 0 ? returnedCount / studentCount : 0
+    const roundedScore = Number(score.toFixed(1))
+    const badge = getClassBadge(score)
+
+    const { data: existing } = await supabase
+      .from('class_badges')
+      .select('id, badge_name')
       .eq('class_id', classId)
-      .eq('status', 'returned')
-      .gte('return_date', startOfMonth)
+      .gte('awarded_at', startOfMonth)
+      .lt('awarded_at', startOfNextMonth)
+      .order('awarded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    const thresholds = [
-      { count: 100, badge: 'Gold Reader 🥇', level: 3 },
-      { count: 70, badge: 'Silver Reader 🥈', level: 2 },
-      { count: 40, badge: 'Bronze Reader 🥉', level: 1 },
-    ]
-
-    for (const threshold of thresholds) {
-      if (count >= threshold.count) {
-        const { data: existing } = await supabase
-          .from('class_badges')
-          .select('id')
-          .eq('class_id', classId)
-          .eq('badge_name', threshold.badge)
-          .gte('awarded_at', startOfMonth)
-          .single()
-
-        if (!existing) {
-          await supabase.from('class_badges').insert({
-            class_id: classId,
-            badge_name: threshold.badge,
-            badge_meta: { level: threshold.level, reads: count },
-          })
-          toast.success(`🏆 Kelas berhasil meraih badge: ${threshold.badge}!`, { duration: 5000 })
-        }
-        break
-      }
+    if (existing?.badge_name === badge.name) {
+      await supabase
+        .from('class_badges')
+        .update({
+          badge_meta: {
+            level: badge.min,
+            score: roundedScore,
+            returned_count: returnedCount,
+            student_count: studentCount,
+          },
+          awarded_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+      return
     }
+
+    if (existing?.id) {
+      await supabase.from('class_badges').update({
+        badge_name: badge.name,
+        badge_meta: {
+          level: badge.min,
+          score: roundedScore,
+          returned_count: returnedCount,
+          student_count: studentCount,
+        },
+        awarded_at: new Date().toISOString(),
+      }).eq('id', existing.id)
+    } else {
+      await supabase.from('class_badges').insert({
+        class_id: classId,
+        badge_name: badge.name,
+        badge_meta: {
+          level: badge.min,
+          score: roundedScore,
+          returned_count: returnedCount,
+          student_count: studentCount,
+        },
+        awarded_at: new Date().toISOString(),
+      })
+    }
+
+    toast.success(`🏆 Kelas berhasil meraih badge: ${badge.name}!`, { duration: 5000 })
   }
 
   const statusTabs = [
@@ -212,7 +288,9 @@ export default function AdminTransactions() {
   ]
 
   const counts = { pending: 0, borrowed: 0, late: 0 }
-  transactions.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++ })
+  transactions.forEach(t => {
+    if (counts[t.status] !== undefined) counts[t.status]++
+  })
 
   return (
     <div className="fade-in">
@@ -228,10 +306,28 @@ export default function AdminTransactions() {
           { label: 'Sedang Dipinjam', val: counts.borrowed, color: '#3b82f6', bg: '#eff6ff', icon: CheckCircle },
           { label: 'Terlambat', val: counts.late, color: '#ef4444', bg: '#fef2f2', icon: AlertTriangle },
         ].map((s, i) => (
-          <div key={i} className="card" style={{
-            padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 160px',
-          }}>
-            <div style={{ width: '40px', height: '40px', background: s.bg, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            key={i}
+            className="card"
+            style={{
+              padding: '14px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              flex: '1 1 160px',
+            }}
+          >
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                background: s.bg,
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <s.icon size={18} color={s.color} />
             </div>
             <div>
@@ -250,8 +346,11 @@ export default function AdminTransactions() {
               key={tab.id}
               onClick={() => setFilter(tab.id)}
               style={{
-                padding: '14px 20px', border: 'none', cursor: 'pointer',
-                fontFamily: 'Poppins, sans-serif', fontSize: '13px',
+                padding: '14px 20px',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'Poppins, sans-serif',
+                fontSize: '13px',
                 fontWeight: filter === tab.id ? 600 : 500,
                 color: filter === tab.id ? 'var(--primary-dark)' : 'var(--text-muted)',
                 background: 'transparent',
@@ -261,21 +360,36 @@ export default function AdminTransactions() {
             >
               {tab.label}
               {counts[tab.id] > 0 && (
-                <span style={{
-                  marginLeft: '6px', padding: '2px 7px',
-                  background: filter === tab.id ? 'var(--primary-pale)' : 'var(--bg-light)',
-                  borderRadius: '20px', fontSize: '11px', fontWeight: 700,
-                  color: filter === tab.id ? 'var(--primary-dark)' : 'var(--text-muted)',
-                }}>
+                <span
+                  style={{
+                    marginLeft: '6px',
+                    padding: '2px 7px',
+                    background: filter === tab.id ? 'var(--primary-pale)' : 'var(--bg-light)',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: filter === tab.id ? 'var(--primary-dark)' : 'var(--text-muted)',
+                  }}
+                >
                   {counts[tab.id]}
                 </span>
               )}
             </button>
           ))}
         </div>
+
         <div style={{ padding: '12px 16px' }}>
           <div style={{ position: 'relative', maxWidth: '320px' }}>
-            <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <Search
+              size={15}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted)',
+              }}
+            />
             <input
               className="input"
               style={{ paddingLeft: '38px' }}
@@ -325,14 +439,36 @@ export default function AdminTransactions() {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           {t.books?.cover_url ? (
-                            <img src={t.books.cover_url} style={{ width: '36px', height: '46px', objectFit: 'cover', borderRadius: '5px' }} />
+                            <img
+                              src={t.books.cover_url}
+                              style={{ width: '36px', height: '46px', objectFit: 'cover', borderRadius: '5px' }}
+                            />
                           ) : (
-                            <div style={{ width: '36px', height: '46px', background: 'var(--primary-pale)', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div
+                              style={{
+                                width: '36px',
+                                height: '46px',
+                                background: 'var(--primary-pale)',
+                                borderRadius: '5px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
                               <span style={{ fontSize: '18px' }}>📚</span>
                             </div>
                           )}
                           <div>
-                            <div style={{ fontWeight: 600, fontSize: '13px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                maxWidth: '160px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
                               {t.books?.title || '-'}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.books?.author}</div>
@@ -345,11 +481,25 @@ export default function AdminTransactions() {
                       </td>
                       <td style={{ fontSize: '13px' }}>{t.classes?.name || '-'}</td>
                       <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        {new Date(t.borrow_date || t.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {new Date(t.borrow_date || t.created_at).toLocaleDateString('id-ID', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
                       </td>
                       <td>
-                        <div style={{ fontSize: '12px', color: isLate ? 'var(--danger)' : 'var(--text-muted)', fontWeight: isLate ? 600 : 400 }}>
-                          {new Date(t.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: isLate ? 'var(--danger)' : 'var(--text-muted)',
+                            fontWeight: isLate ? 600 : 400,
+                          }}
+                        >
+                          {new Date(t.due_date).toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
                         </div>
                         {isLate && daysLate > 0 && (
                           <div style={{ fontSize: '10px', color: 'var(--danger)' }}>{daysLate} hari terlambat</div>
@@ -366,7 +516,13 @@ export default function AdminTransactions() {
                       </td>
                       <td>
                         <span className={`badge-chip ${t.status === 'borrowed' && isLate ? 'late' : t.status}`}>
-                          {{ borrowed: 'Dipinjam', returned: 'Dikembalikan', late: 'Terlambat', pending: 'Menunggu ACC', cancelled: 'Dibatalkan' }[t.status] || t.status}
+                          {{
+                            borrowed: 'Dipinjam',
+                            returned: 'Dikembalikan',
+                            late: 'Terlambat',
+                            pending: 'Menunggu ACC',
+                            cancelled: 'Dibatalkan',
+                          }[t.status] || t.status}
                         </span>
                       </td>
                       <td>

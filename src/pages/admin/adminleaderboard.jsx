@@ -1,51 +1,104 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, cloneElement } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Trophy, Star, Medal, Crown, Award, BookOpen } from 'lucide-react'
+import { Trophy, Star, Medal, Crown, CircleStar, Sparkles, School } from 'lucide-react'
 
-const BADGE_LEVELS = [
-  { min: 100, name: 'Gold Reader', emoji: '🥇', color: '#f59e0b', bg: '#fffbeb', label: 'Gold', border: '#fbbf24' },
-  { min: 70, name: 'Silver Reader', emoji: '🥈', color: '#6b7280', bg: '#f9fafb', label: 'Silver', border: '#9ca3af' },
-  { min: 40, name: 'Bronze Reader', emoji: '🥉', color: '#b45309', bg: '#fef3c7', label: 'Bronze', border: '#d97706' },
+const CLASS_BADGE_LEVELS = [
+  {
+    min: 5.0001,
+    name: 'Bintang Perpustakaan',
+    emoji: <Sparkles />,
+    color: '#f59e0b',
+    bg: '#fffbeb',
+    border: '#fbbf24',
+    label: '> 5',
+  },
+  {
+    min: 2,
+    name: 'Sahabat Buku',
+    emoji: <Medal />,
+    color: '#6b7280',
+    bg: '#f9fafb',
+    border: '#9ca3af',
+    label: '2 - 5',
+  },
+  {
+    min: 0,
+    name: 'Pemula Membaca',
+    emoji: <CircleStar />,
+    color: '#b45309',
+    bg: '#fef3c7',
+    border: '#d97706',
+    label: '< 2',
+  },
 ]
 
-function getBadge(count) {
-  return BADGE_LEVELS.find(b => count >= b.min) || null
+function getBadge(score) {
+  return CLASS_BADGE_LEVELS.find(b => score >= b.min) || CLASS_BADGE_LEVELS[2]
 }
 
-function getNextBadge(count) {
-  const levels = [...BADGE_LEVELS].reverse()
-  return levels.find(b => b.min > count) || null
+function formatScore(score) {
+  return Number(score || 0).toFixed(1)
 }
 
 export default function AdminLeaderboard() {
   const [classData, setClassData] = useState([])
   const [topStudents, setTopStudents] = useState([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState('classes') // clases | studets
+  const [view, setView] = useState('classes') // classes | students
 
-  useEffect(() => { fetchLeaderboardData() }, [])
+  useEffect(() => {
+    fetchLeaderboardData()
+  }, [])
 
   const fetchLeaderboardData = async () => {
     try {
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 
-      // Class leaderboard
-      const { data: classTxns } = await supabase
-        .from('transactions')
-        .select('class_id, classes(id, name, teacher)')
-        .eq('status', 'returned')
-        .gte('return_date', startOfMonth)
+      const [classesRes, txnsRes, studentsRes] = await Promise.all([
+        supabase.from('classes').select('id, name, teacher'),
+        supabase
+          .from('transactions')
+          .select('class_id')
+          .eq('status', 'returned')
+          .gte('return_date', startOfMonth),
+        supabase.from('students').select('id, class_id'),
+      ])
 
-      const classMap = {}
-      classTxns?.forEach(t => {
-        const key = t.class_id
-        if (!classMap[key]) classMap[key] = { ...t.classes, count: 0 }
-        classMap[key].count++
+      const classesData = classesRes.data || []
+      const classTxns = txnsRes.data || []
+      const studentsData = studentsRes.data || []
+
+      const studentCountMap = {}
+      studentsData.forEach(s => {
+        if (s.class_id != null) {
+          studentCountMap[s.class_id] = (studentCountMap[s.class_id] || 0) + 1
+        }
       })
-      const sorted = Object.values(classMap).sort((a, b) => b.count - a.count)
-      setClassData(sorted)
 
-      // Top students berdasarkan point
+      const txnCountMap = {}
+      classTxns.forEach(t => {
+        if (t.class_id != null) {
+          txnCountMap[t.class_id] = (txnCountMap[t.class_id] || 0) + 1
+        }
+      })
+
+      const rankedClasses = classesData
+        .map(cls => {
+          const returnedCount = txnCountMap[cls.id] || 0
+          const studentCount = studentCountMap[cls.id] || 0
+          const score = studentCount > 0 ? returnedCount / studentCount : 0
+
+          return {
+            ...cls,
+            count: returnedCount,
+            studentCount,
+            score,
+          }
+        })
+        .sort((a, b) => b.score - a.score || b.count - a.count || a.name.localeCompare(b.name))
+
+      setClassData(rankedClasses)
+
       const { data: pointsData } = await supabase
         .from('points_log')
         .select('student_id, points, students(name, nis, classes(name))')
@@ -54,13 +107,21 @@ export default function AdminLeaderboard() {
       const studentMap = {}
       pointsData?.forEach(p => {
         const key = p.student_id
-        if (!studentMap[key]) studentMap[key] = {
-          id: key, ...p.students, total: 0
+        if (!studentMap[key]) {
+          studentMap[key] = {
+            id: key,
+            ...p.students,
+            total: 0,
+          }
         }
         studentMap[key].total += p.points
       })
-      setTopStudents(Object.values(studentMap).sort((a, b) => b.total - a.total).slice(0, 10))
 
+      setTopStudents(
+        Object.values(studentMap)
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 10)
+      )
     } catch (err) {
       console.error(err)
     } finally {
@@ -75,36 +136,45 @@ export default function AdminLeaderboard() {
     return <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-muted)' }}>{rank}</span>
   }
 
-  if (loading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
-      <div className="spinner" />
-    </div>
-  )
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
+        <div className="spinner" />
+      </div>
+    )
+  }
 
   return (
     <div className="fade-in">
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 700 }}>Leaderboard & Gamifikasi</h1>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          {new Date().toLocaleString('id-ID', { month: 'long', year: 'numeric' })} — Target: 40 buku/kelas
+          {new Date().toLocaleString('id-ID', { month: 'long', year: 'numeric' })} — Ranking berbasis skor kelas
         </p>
       </div>
 
       {/* Badge Legend */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        {BADGE_LEVELS.map((b, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: '10px',
-            padding: '12px 20px',
-            background: b.bg,
-            border: `1.5px solid ${b.border}`,
-            borderRadius: 'var(--radius-md)',
-            flex: '1 1 160px',
-          }}>
-            <span style={{ fontSize: '24px' }}>{b.emoji}</span>
+        {CLASS_BADGE_LEVELS.map((b, i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '12px 20px',
+              background: `linear-gradient(115deg, transparent 70%, rgba(255, 255, 255, 0.28) 70%), ${b.border}`,
+              border: `1.5px solid ${b.border}`,
+              borderRadius: 'var(--radius-md)',
+              flex: '1 1 160px',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center' }}>
+              {cloneElement(b.emoji, { size: 25, color: '#fff' })}
+            </span>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: b.color }}>{b.label}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>≥ {b.min} buku</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{b.name}</div>
+              <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.85)' }}>{b.label}</div>
             </div>
           </div>
         ))}
@@ -128,7 +198,8 @@ export default function AdminLeaderboard() {
               color: view === v.id ? '#1a1f0e' : 'var(--text-secondary)',
               cursor: 'pointer',
               fontFamily: 'Poppins, sans-serif',
-              fontSize: '13px', fontWeight: 600,
+              fontSize: '13px',
+              fontWeight: 600,
             }}
           >
             {v.label}
@@ -141,16 +212,16 @@ export default function AdminLeaderboard() {
           {classData.length === 0 ? (
             <div className="card empty-state">
               <Trophy size={40} />
-              <h3>Belum ada data bulan ini</h3>
-              <p>Data akan muncul setelah ada peminjaman yang dikembalikan</p>
+              <h3>Belum ada data kelas</h3>
+              <p>Data akan muncul setelah kelas dan transaksi tersedia</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {classData.map((cls, idx) => {
-                const badge = getBadge(cls.count)
-                const next = getNextBadge(cls.count)
-                const progress = next ? Math.min((cls.count / next.min) * 100, 100) : 100
+                const badge = getBadge(cls.score)
                 const rank = idx + 1
+                const score = formatScore(cls.score)
+                const progress = Math.min((cls.score / 5) * 100, 100)
 
                 return (
                   <div
@@ -158,29 +229,51 @@ export default function AdminLeaderboard() {
                     className="card"
                     style={{
                       padding: '20px 24px',
-                      border: rank === 1 ? '2px solid #f59e0b' : badge ? `1.5px solid ${badge.border}` : '1px solid var(--border-light)',
-                      background: rank === 1 ? 'linear-gradient(135deg, #fffbeb 0%, #fff 100%)' : badge ? badge.bg : 'white',
+                      border:
+                        rank === 1
+                          ? '2px solid #f59e0b'
+                          : badge
+                            ? `1.5px solid ${badge.border}`
+                            : '1px solid var(--border-light)',
+                      background:
+                        rank === 1
+                          ? 'linear-gradient(135deg, #fffbeb 0%, #fff 100%)'
+                          : badge
+                            ? badge.bg
+                            : 'white',
                       position: 'relative',
                       overflow: 'hidden',
                     }}
                   >
                     {rank === 1 && (
-                      <div style={{
-                        position: 'absolute', top: 0, right: 0,
-                        width: '80px', height: '80px',
-                        background: 'rgba(251, 191, 36, 0.08)',
-                        borderRadius: '0 0 0 80px',
-                      }} />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          right: 0,
+                          width: '80px',
+                          height: '80px',
+                          background: 'rgba(251, 191, 36, 0.08)',
+                          borderRadius: '0 0 0 80px',
+                        }}
+                      />
                     )}
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       {/* Rank */}
-                      <div style={{
-                        width: '44px', height: '44px', flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: rank <= 3 ? 'rgba(255,255,255,0.8)' : 'var(--bg-light)',
-                        borderRadius: '50%', border: '1px solid var(--border)',
-                      }}>
+                      <div
+                        style={{
+                          width: '44px',
+                          height: '44px',
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: rank <= 3 ? 'rgba(255,255,255,0.8)' : 'var(--bg-light)',
+                          borderRadius: '50%',
+                          border: '1px solid var(--border)',
+                        }}
+                      >
                         <RankIcon rank={rank} />
                       </div>
 
@@ -189,37 +282,55 @@ export default function AdminLeaderboard() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                           <span style={{ fontSize: '16px', fontWeight: 700 }}>{cls.name}</span>
                           {badge && (
-                            <span style={{
-                              fontSize: '11px', fontWeight: 700,
-                              padding: '3px 10px', borderRadius: '20px',
-                              background: badge.bg, color: badge.color,
-                              border: `1px solid ${badge.border}`,
-                            }}>
-                              {badge.emoji} {badge.label}
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                background: `linear-gradient(115deg, transparent 70%, rgba(255, 255, 255, 0.28) 70%), ${badge.border}`,
+                                color: '#fff',
+                                border: `1px solid ${badge.border}`,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                            >
+                              {cloneElement(badge.emoji, { size: 14, color: '#fff' })}
+                              <span>{badge.name}</span>
                             </span>
                           )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ flex: 1, height: '8px', background: 'rgba(0,0,0,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-                            <div style={{
-                              height: '100%',
-                              width: `${badge ? 100 : (cls.count / 40) * 100}%`,
-                              background: badge ? badge.color : 'var(--primary)',
+                          <div
+                            style={{
+                              flex: 1,
+                              height: '8px',
+                              background: 'rgba(0,0,0,0.06)',
                               borderRadius: '4px',
-                              transition: 'width 0.8s ease',
-                            }} />
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${progress}%`,
+                                background: badge ? badge.color : 'var(--primary)',
+                                borderRadius: '4px',
+                                transition: 'width 0.8s ease',
+                              }}
+                            />
                           </div>
                           <span style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                            {cls.count}/{badge ? badge.min : 40}
+                            Skor {score}
                           </span>
                         </div>
 
-                        {!badge && next && (
-                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            {next.min - cls.count} buku lagi untuk raih {next.emoji} {next.label}
-                          </p>
-                        )}
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Skor kelas bulan ini: {score}
+                        </p>
+
                         {cls.teacher && (
                           <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                             Wali Kelas: {cls.teacher}
@@ -229,7 +340,14 @@ export default function AdminLeaderboard() {
 
                       {/* Count Display */}
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '28px', fontWeight: 800, color: badge ? badge.color : 'var(--text-primary)', lineHeight: 1 }}>
+                        <div
+                          style={{
+                            fontSize: '28px',
+                            fontWeight: 800,
+                            color: badge ? badge.color : 'var(--text-primary)',
+                            lineHeight: 1,
+                          }}
+                        >
                           {cls.count}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>buku</div>
@@ -270,13 +388,34 @@ export default function AdminLeaderboard() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', borderRadius: '50%',
-                            background: i === 0 ? '#fef3c7' : i === 1 ? '#f3f4f6' : i === 2 ? '#fef3c7' : 'var(--primary-pale)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '13px', fontWeight: 700,
-                            color: i === 0 ? '#f59e0b' : i === 1 ? '#6b7280' : i === 2 ? '#d97706' : 'var(--primary-dark)',
-                          }}>
+                          <div
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              background:
+                                i === 0
+                                  ? '#fef3c7'
+                                  : i === 1
+                                    ? '#f3f4f6'
+                                    : i === 2
+                                      ? '#fef3c7'
+                                      : 'var(--primary-pale)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              color:
+                                i === 0
+                                  ? '#f59e0b'
+                                  : i === 1
+                                    ? '#6b7280'
+                                    : i === 2
+                                      ? '#d97706'
+                                      : 'var(--primary-dark)',
+                            }}
+                          >
                             {s.name?.charAt(0)}
                           </div>
                           <div>
@@ -294,11 +433,44 @@ export default function AdminLeaderboard() {
                       </td>
                       <td>
                         {s.total >= 50 ? (
-                          <span style={{ background: '#fffbeb', color: '#d97706', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>⭐ Elite Reader</span>
+                          <span
+                            style={{
+                              background: '#fffbeb',
+                              color: '#d97706',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                            }}
+                          >
+                            ⭐ Elite Reader
+                          </span>
                         ) : s.total >= 20 ? (
-                          <span style={{ background: '#eff6ff', color: '#3b82f6', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>📚 Active Reader</span>
+                          <span
+                            style={{
+                              background: '#eff6ff',
+                              color: '#3b82f6',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                            }}
+                          >
+                            📚 Active Reader
+                          </span>
                         ) : (
-                          <span style={{ background: 'var(--primary-pale)', color: 'var(--primary-dark)', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>🌱 Beginner</span>
+                          <span
+                            style={{
+                              background: 'var(--primary-pale)',
+                              color: 'var(--primary-dark)',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                            }}
+                          >
+                            🌱 Beginner
+                          </span>
                         )}
                       </td>
                     </tr>

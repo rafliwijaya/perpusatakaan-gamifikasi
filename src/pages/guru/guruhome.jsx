@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../context/authcontext'
+import { useAuth } from '../../context/AuthContext'
 import { Search, MapPin, BookOpen, Tag, Filter, X, CheckCircle, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -29,17 +29,20 @@ export default function GuruHome() {
   }
 
   const checkGuruStatus = async () => {
+    const sid = profile.student_id
+    if (!sid) return
+
     const { data: borrows } = await supabase
       .from('transactions')
       .select('*')
-      .eq('student_id', profile.id)
+      .eq('student_id', sid)
       .in('status', ['borrowed', 'late', 'pending'])
     setActiveBorrows(borrows || [])
 
     const { data: fines } = await supabase
       .from('transactions')
       .select('fine_amount')
-      .eq('student_id', profile.id)
+      .eq('student_id', sid)
       .eq('status', 'late')
       .gt('fine_amount', 0)
     setHasFine(fines && fines.length > 0)
@@ -76,20 +79,40 @@ export default function GuruHome() {
   }
 
   const handleBorrow = async (book) => {
+    const sid = profile.student_id
+    if (!sid) {
+      toast.error('Akun guru belum terdaftar sebagai peminjam. Hubungi admin.')
+      return
+    }
+
     if (hasFine) return toast.error('Kamu memiliki denda yang belum dibayar.')
-    if (activeBorrows.find(b => b.book_id === book.id)) return toast.error('Kamu sudah meminjam buku ini.')
+
+    // Maksimal 3 buku aktif
+    const activeBorrowCount = activeBorrows.filter(b =>
+      ['borrowed', 'pending', 'late'].includes(b.status)
+    ).length
+    if (activeBorrowCount >= 3) {
+      toast.error('Kamu sudah meminjam 3 buku. Kembalikan buku terlebih dahulu.', { duration: 4000 })
+      return
+    }
+
+    if (activeBorrows.find(b => b.book_id === book.id)) {
+      return toast.error('Kamu sudah meminjam buku ini.')
+    }
     if (book.status !== 'available') return toast.error('Buku sedang dipinjam.')
 
     setBorrowing(book.id)
     try {
-      await supabase.from('transactions').insert({
+      const { error: txError } = await supabase.from('transactions').insert({
         book_id: book.id,
-        student_id: profile.id,
-        class_id: profile.classes?.id || null,
+        student_id: sid,
+        class_id: null,
         status: 'pending',
         borrow_date: new Date().toISOString(),
         due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       })
+      if (txError) throw txError
+
       await supabase.from('books').update({ status: 'borrowed' }).eq('id', book.id)
       toast.success(`Permintaan pinjam "${book.title}" berhasil! Ambil di perpustakaan.`, { duration: 5000 })
       fetchBooks()
@@ -117,7 +140,7 @@ export default function GuruHome() {
         <div style={{ position: 'relative', zIndex: 1 }}>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Selamat datang</p>
           <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-            {profile?.name || 'Guru'}
+            {profile?.name || 'Guru'} 👋
           </h1>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
             NIP {profile?.nip} • Wali Kelas {profile?.classes?.name || '-'}
@@ -236,7 +259,7 @@ export default function GuruHome() {
                     disabled={!available || pending || borrowed || borrowing === book.id || hasFine}
                     onClick={() => handleBorrow(book)}
                   >
-                    {borrowing === book.id ? 'Memproses...' : pending ? 'Menunggu ACC' : borrowed ? 'Dipinjam' : !available ? 'Tidak Tersedia' : 'Pinjam'}
+                    {borrowing === book.id ? 'Memproses...' : pending ? 'Menunggu ACC' : borrowed ? '✓ Dipinjam' : !available ? 'Tidak Tersedia' : 'Pinjam'}
                   </button>
                 </div>
               </div>

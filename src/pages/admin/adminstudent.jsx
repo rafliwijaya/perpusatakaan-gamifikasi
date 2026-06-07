@@ -1,9 +1,7 @@
-// adminstudent.jsx
-
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { createClient } from '@supabase/supabase-js'
-import { Search, Plus, Users, X, Eye, UserCheck, UserX, GraduationCap, School } from 'lucide-react'
+import { Search, Plus, Users, X, Eye, UserCheck, UserX, GraduationCap, School, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const supabaseSignUp = createClient(
@@ -12,7 +10,7 @@ const supabaseSignUp = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 )
 
-// TAB SISWA 
+// ─── TAB SISWA ───────────────────────────
 function TabSiswa({ classes }) {
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,12 +21,18 @@ function TabSiswa({ classes }) {
   const [saving, setSaving] = useState(false)
   const [viewStudent, setViewStudent] = useState(null)
   const [studentStats, setStudentStats] = useState(null)
+  const [editStudent, setEditStudent] = useState(null)
+  const [editForm, setEditForm] = useState({ class_id: '', password: '' })
+  const [editSaving, setEditSaving] = useState(false)
 
   useEffect(() => { fetchStudents() }, [search, filterClass])
 
   const fetchStudents = async () => {
     setLoading(true)
-    let query = supabase.from('students').select('*, classes(name, teacher)').order('name')
+    let query = supabase.from('students')
+      .select('*, classes(name, teacher)')
+      .not('class_id', 'is', null)  // hanya tampilkan siswa yang punya kelas
+      .order('name')
     if (filterClass) query = query.eq('class_id', parseInt(filterClass))
     const { data, error } = await query
     if (error) { toast.error('Gagal memuat data siswa'); setLoading(false); return }
@@ -45,6 +49,7 @@ function TabSiswa({ classes }) {
     if (!form.name.trim()) return toast.error('Nama wajib diisi')
     if (!form.nis.trim()) return toast.error('NIS wajib diisi')
     if (!form.password.trim() || form.password.length < 6) return toast.error('Password minimal 6 karakter')
+    if (!form.class_id) return toast.error('Kelas wajib dipilih')
     setSaving(true)
     try {
       const { data: existing } = await supabase.from('students').select('id').eq('nis', form.nis.trim()).maybeSingle()
@@ -72,6 +77,41 @@ function TabSiswa({ classes }) {
       toast.error(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const openEdit = (student) => {
+    setEditStudent(student)
+    setEditForm({ class_id: student.class_id || '', password: '' })
+  }
+
+  const handleEditSave = async () => {
+    if (!editForm.class_id) return toast.error('Kelas wajib dipilih')
+    setEditSaving(true)
+    try {
+      const { error } = await supabase.from('students')
+        .update({ class_id: parseInt(editForm.class_id) })
+        .eq('id', editStudent.id)
+      if (error) throw error
+
+      if (editForm.password.trim()) {
+        if (editForm.password.length < 6) {
+          toast.error('Password minimal 6 karakter')
+          setEditSaving(false)
+          return
+        }
+        // Update password via Supabase Auth (pakai admin API tidak bisa di frontend)
+        // Solusi: update langsung di supabase dashboard atau gunakan reset password
+        toast('Password hanya bisa direset oleh admin via Supabase Dashboard.', { icon: 'ℹ️' })
+      }
+
+      toast.success('Data siswa berhasil diperbarui!')
+      setEditStudent(null)
+      fetchStudents()
+    } catch (err) {
+      toast.error('Gagal: ' + err.message)
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -127,7 +167,12 @@ function TabSiswa({ classes }) {
                           : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '3px 8px', borderRadius: '20px' }}><UserX size={11} /> Belum Aktif</span>
                         }
                       </td>
-                      <td><button className="btn btn-ghost btn-sm" onClick={() => viewDetail(s)}><Eye size={13} /> Detail</button></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => viewDetail(s)}><Eye size={13} /> Detail</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => openEdit(s)} style={{ color: '#3b82f6' }}><Pencil size={13}/> Edit</button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -207,6 +252,42 @@ function TabSiswa({ classes }) {
           </div>
         </div>
       )}
+      {/* Modal Edit Siswa */}
+      {editStudent && (
+        <div className="modal-overlay" onClick={() => !editSaving && setEditStudent(null)}>
+          <div className="modal-box" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '17px', fontWeight: 700 }}>Edit Siswa</h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{editStudent.name}</p>
+              </div>
+              <button onClick={() => setEditStudent(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Kelas *</label>
+                <select className="input" value={editForm.class_id} onChange={e => setEditForm(f => ({ ...f, class_id: e.target.value }))}>
+                  <option value="">Pilih kelas...</option>
+                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}{c.teacher ? ` — ${c.teacher}` : ''}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Password Baru <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opsional)</span></label>
+                <input className="input" type="text" placeholder="Kosongkan jika tidak ingin ubah" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} />
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  ⚠️ Reset password harus dilakukan via Supabase Dashboard → Authentication → Users
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setEditStudent(null)} disabled={editSaving}>Batal</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleEditSave} disabled={editSaving}>
+                  {editSaving ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -218,6 +299,8 @@ function TabGuru({ classes, onRefresh }) {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ name: '', nip: '', password: '' })
   const [saving, setSaving] = useState(false)
+  const [editTeacher, setEditTeacher] = useState(null)
+  const [editSaving, setEditSaving] = useState(false)
 
   useEffect(() => { fetchTeachers() }, [])
 
@@ -268,6 +351,26 @@ function TabGuru({ classes, onRefresh }) {
     }
   }
 
+  const handleEditTeacher = async () => {
+    if (!editTeacher.newPassword?.trim()) {
+      toast('Masukkan password baru untuk guru ini.', { icon: 'ℹ️' })
+      return
+    }
+    if (editTeacher.newPassword.length < 6) return toast.error('Password minimal 6 karakter')
+    setEditSaving(true)
+    try {
+      // Password update harus via Supabase Dashboard karena butuh service role
+      toast('Reset password dilakukan via Supabase Dashboard → Authentication → Users → Edit user.', {
+        icon: 'ℹ️', duration: 6000
+      })
+      setEditTeacher(null)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -280,7 +383,7 @@ function TabGuru({ classes, onRefresh }) {
           : (
             <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
               <table>
-                <thead><tr><th>#</th><th>Nama Guru</th><th>NIP</th><th>Email Login</th><th>Wali Kelas</th><th>Status</th></tr></thead>
+                <thead><tr><th>#</th><th>Nama Guru</th><th>NIP</th><th>Email Login</th><th>Wali Kelas</th><th>Status</th><th>Aksi</th></tr></thead>
                 <tbody>
                   {teachers.map((t, i) => (
                     <tr key={t.id}>
@@ -300,6 +403,9 @@ function TabGuru({ classes, onRefresh }) {
                           : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '3px 8px', borderRadius: '20px' }}><UserX size={11} /> Belum Aktif</span>
                         }
                       </td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setEditTeacher({ ...t, newPassword: '' })} style={{ color: '#3b82f6' }}><Pencil size={13}/> Edit</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -307,6 +413,37 @@ function TabGuru({ classes, onRefresh }) {
             </div>
           )}
       </div>
+
+      {/* Modal Edit Guru */}
+      {editTeacher && (
+        <div className="modal-overlay" onClick={() => !editSaving && setEditTeacher(null)}>
+          <div className="modal-box" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '17px', fontWeight: 700 }}>Edit Guru</h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{editTeacher.name}</p>
+              </div>
+              <button onClick={() => setEditTeacher(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ padding: '12px 14px', background: '#eff6ff', borderRadius: '10px', fontSize: '12px', color: '#3b82f6' }}>
+                <strong>Info Akun:</strong><br />
+                Email: <strong>{editTeacher.nip}@guru.perpustakaan.sch.id</strong><br />
+                NIP: <strong>{editTeacher.nip}</strong>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Reset Password</label>
+                <div style={{ padding: '12px 14px', background: '#fffbeb', borderRadius: '10px', fontSize: '12px', color: '#92400e', lineHeight: 1.6 }}>
+                  ⚠️ Untuk reset password guru, lakukan melalui:<br />
+                  <strong>Supabase Dashboard → Authentication → Users</strong><br />
+                  Cari email <strong>{editTeacher.nip}@guru.perpustakaan.sch.id</strong> → Send password reset
+                </div>
+              </div>
+              <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setEditTeacher(null)}>Tutup</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="modal-overlay" onClick={() => !saving && setShowModal(false)}>
@@ -345,6 +482,8 @@ function TabKelas({ onRefresh }) {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ name: '', teacher_id: '' })
   const [saving, setSaving] = useState(false)
+  const [editClass, setEditClass] = useState(null)
+  const [editSaving, setEditSaving] = useState(false)
 
   useEffect(() => { fetchData() }, [])
 
@@ -357,6 +496,41 @@ function TabKelas({ onRefresh }) {
     setClasses(classData || [])
     setTeachers(teacherData || [])
     setLoading(false)
+  }
+
+  const handleEditClass = async () => {
+    if (!editClass.teacher_id && editClass.teacher_id !== 0) {
+      // boleh kosongkan wali kelas
+    }
+    setEditSaving(true)
+    try {
+      const selectedTeacher = editClass.teacher_id
+        ? teachers.find(t => t.id === parseInt(editClass.teacher_id))
+        : null
+
+      const { error } = await supabase.from('classes').update({
+        teacher: selectedTeacher?.name || null,
+        teacher_id: selectedTeacher ? parseInt(editClass.teacher_id) : null,
+      }).eq('id', editClass.id)
+
+      if (error) throw error
+
+      // Update class_id di tabel teachers — hapus dari guru lama dulu
+      await supabase.from('teachers').update({ class_id: null }).eq('class_id', editClass.id)
+
+      // Set ke guru baru
+      if (selectedTeacher) {
+        await supabase.from('teachers').update({ class_id: editClass.id }).eq('id', selectedTeacher.id)
+      }
+
+      toast.success(`✅ Kelas ${editClass.name} berhasil diperbarui!`)
+      setEditClass(null)
+      fetchData()
+    } catch (err) {
+      toast.error('Gagal: ' + err.message)
+    } finally {
+      setEditSaving(false)
+    }
   }
 
   const handleSave = async () => {
@@ -402,7 +576,7 @@ function TabKelas({ onRefresh }) {
           : (
             <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
               <table>
-                <thead><tr><th>#</th><th>Nama Kelas</th><th>Wali Kelas</th></tr></thead>
+                <thead><tr><th>#</th><th>Nama Kelas</th><th>Wali Kelas</th><th>Aksi</th></tr></thead>
                 <tbody>
                   {classes.map((c, i) => (
                     <tr key={c.id}>
@@ -414,6 +588,11 @@ function TabKelas({ onRefresh }) {
                         </div>
                       </td>
                       <td style={{ fontSize: '13px' }}>{c.teacher || <span style={{ color: 'var(--text-muted)' }}>Belum ada wali kelas</span>}</td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm"
+                          onClick={() => setEditClass({ ...c, teacher_id: c.teacher_id || '' })}
+                          style={{ color: '#3b82f6' }}><Pencil size={13}/> Edit</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -421,6 +600,36 @@ function TabKelas({ onRefresh }) {
             </div>
           )}
       </div>
+
+      {/* Modal Edit Kelas */}
+      {editClass && (
+        <div className="modal-overlay" onClick={() => !editSaving && setEditClass(null)}>
+          <div className="modal-box" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '17px', fontWeight: 700 }}>Edit Kelas</h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Kelas {editClass.name}</p>
+              </div>
+              <button onClick={() => setEditClass(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Wali Kelas</label>
+                <select className="input" value={editClass.teacher_id || ''} onChange={e => setEditClass(c => ({ ...c, teacher_id: e.target.value }))}>
+                  <option value="">Tidak ada wali kelas</option>
+                  {teachers.map(t => <option key={t.id} value={t.id}>{t.name} (NIP: {t.nip})</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setEditClass(null)} disabled={editSaving}>Batal</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleEditClass} disabled={editSaving}>
+                  {editSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="modal-overlay" onClick={() => !saving && setShowModal(false)}>

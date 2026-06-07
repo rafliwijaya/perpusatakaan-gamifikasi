@@ -74,8 +74,20 @@ export function AuthProvider({ children }) {
             .maybeSingle()
           kelasData = kelas
         }
+
+        const { data: studentRecord } = await supabase
+          .from('students')
+          .select('id')
+          .eq('auth_id', authUser.id)
+          .maybeSingle()
+
         setRole('guru')
-        setProfile({ ...teacherData, role: 'guru', classes: kelasData })
+        setProfile({
+          ...teacherData,
+          role: 'guru',
+          classes: kelasData,
+          student_id: studentRecord?.id || null,
+        })
         return
       }
 
@@ -88,6 +100,7 @@ export function AuthProvider({ children }) {
       if (studentErr) console.warn('students query error:', studentErr.message)
 
       if (studentData) {
+        // Fetch nama kelas secara terpisah
         let kelasData = null
         if (studentData.class_id) {
           const { data: kelas } = await supabase

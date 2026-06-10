@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { Bar, Line, Doughnut } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -12,9 +14,9 @@ import {
   Tooltip,
   Legend,
   ArcElement,
-  Filler
+  Filler,
 } from 'chart.js'
-import { TrendingUp, BookOpen, AlertTriangle, HandCoins, Printer } from 'lucide-react'
+import { TrendingUp, BookOpen, AlertTriangle, HandCoins, Printer, X, Download } from 'lucide-react'
 
 ChartJS.register(
   CategoryScale,
@@ -61,6 +63,10 @@ function formatScore(score) {
   return Number(score || 0).toFixed(1)
 }
 
+function formatNumber(n) {
+  return Number(n || 0).toLocaleString('id-ID')
+}
+
 export default function AdminReports() {
   const [monthlyBorrows, setMonthlyBorrows] = useState([])
   const [categoryData, setCategoryData] = useState([])
@@ -68,6 +74,8 @@ export default function AdminReports() {
   const [bookTypeData, setBookTypeData] = useState([])
   const [fineData, setFineData] = useState({ total: 0, count: 0 })
   const [loading, setLoading] = useState(true)
+  const [showPdfModal, setShowPdfModal] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   useEffect(() => {
     fetchReportData()
@@ -111,10 +119,7 @@ export default function AdminReports() {
       }
       setMonthlyBorrows(monthly)
 
-      const { data: books } = await supabase
-        .from('books')
-        .select('category, type')
-
+      const { data: books } = await supabase.from('books').select('category')
       const catMap = {}
       books?.forEach(b => {
         const c = b.category || 'Lainnya'
@@ -144,55 +149,12 @@ export default function AdminReports() {
         { type: 'teks', label: 'Teks', value: typeMap.teks },
         { type: 'bergambar', label: 'Bergambar', value: typeMap.bergambar },
         { type: 'campuran', label: 'Campuran', value: typeMap.campuran },
-      ].sort((a, b) => b.value - a.value))
-
-      const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-
-      const [classesRes, studentsRes, classTxnsRes] = await Promise.all([
-        supabase.from('classes').select('id, name'),
-        supabase.from('students').select('id, class_id'),
-        supabase
-          .from('transactions')
-          .select('class_id')
-          .eq('status', 'returned')
-          .gte('return_date', startOfMonth),
       ])
 
-      const classesData = classesRes.data || []
-      const studentsData = studentsRes.data || []
-      const classTxns = classTxnsRes.data || []
-
-      const studentCountMap = {}
-      studentsData.forEach(s => {
-        if (s.class_id != null) {
-          studentCountMap[s.class_id] = (studentCountMap[s.class_id] || 0) + 1
-        }
-      })
-
-      const returnedCountMap = {}
-      classTxns.forEach(t => {
-        if (t.class_id != null) {
-          returnedCountMap[t.class_id] = (returnedCountMap[t.class_id] || 0) + 1
-        }
-      })
-
-      const classStats = classesData
-        .map(cls => {
-          const returnedCount = returnedCountMap[cls.id] || 0
-          const studentCount = studentCountMap[cls.id] || 0
-          const score = studentCount > 0 ? returnedCount / studentCount : 0
-
-          return {
-            id: cls.id,
-            name: cls.name,
-            returnedCount,
-            studentCount,
-            score,
-          }
-        })
-        .sort((a, b) => b.score - a.score || b.returnedCount - a.returnedCount || a.name.localeCompare(b.name))
-
-      setClassMonthly(classStats)
+      const { data: rankings } = await supabase.rpc('get_class_rankings')
+      setClassMonthly(
+        (rankings || []).sort((a, b) => Number(a.rank) - Number(b.rank))
+      )
 
       const { data: fines } = await supabase
         .from('transactions')
@@ -208,9 +170,9 @@ export default function AdminReports() {
     }
   }
 
-  const handlePrint = () => {
-    window.print()
-  }
+  const monthlyTotal = monthlyBorrows.reduce((s, m) => s + m.total, 0)
+  const monthlyReturned = monthlyBorrows.reduce((s, m) => s + m.returned, 0)
+  const monthlyLate = monthlyBorrows.reduce((s, m) => s + m.late, 0)
 
   const chartFont = { family: 'Poppins', size: 11 }
   const chartTooltipFont = { family: 'Poppins' }
@@ -241,12 +203,12 @@ export default function AdminReports() {
   }
 
   const classBarData = {
-    labels: classMonthly.map(c => c.name),
+    labels: classMonthly.map(c => c.class_name),
     datasets: [{
       label: 'Buku Dibaca',
-      data: classMonthly.map(c => c.returnedCount),
+      data: classMonthly.map(c => c.returned_count),
       backgroundColor: classMonthly.map(c => {
-        const level = getClassLevel(c.score)
+        const level = getClassLevel(Number(c.score))
         return level.color
       }),
       borderRadius: 8,
@@ -284,6 +246,137 @@ export default function AdminReports() {
     },
   }
 
+  const openPdfDialog = () => setShowPdfModal(true)
+
+  const buildPdf = () => {
+    const doc = new jsPDF('p', 'mm', 'a4')
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const marginX = 14
+    let y = 16
+
+    doc.setProperties({ title: 'Laporan Statistik Perpustakaan' })
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(16)
+    doc.text('LAPORAN STATISTIK PERPUSTAKAAN', pageWidth / 2, y, { align: 'center' })
+
+    y += 8
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleString('id-ID')}`, pageWidth / 2, y, { align: 'center' })
+
+    y += 10
+    autoTable(doc, {
+      startY: y,
+      head: [['Ringkasan', 'Nilai']],
+      body: [
+        ['Total Peminjaman (12 bln)', formatNumber(monthlyTotal)],
+        ['Total Returned (12 bln)', formatNumber(monthlyReturned)],
+        ['Total Late (12 bln)', formatNumber(monthlyLate)],
+        ['Total Denda Terkumpul', `Rp ${formatNumber(fineData.total)}`],
+        ['Kasus Keterlambatan', formatNumber(fineData.count)],
+      ],
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [20, 20, 20], textColor: 255 },
+      columnStyles: {
+        1: { halign: 'right' },
+      },
+      margin: { left: marginX, right: marginX },
+    })
+
+    y = doc.lastAutoTable.finalY + 10
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.text('Tren Peminjaman 12 Bulan', marginX, y)
+
+    y += 4
+    autoTable(doc, {
+      startY: y,
+      head: [['Bulan', 'Total', 'Returned', 'Late']],
+      body: monthlyBorrows.map(m => [
+        m.label,
+        formatNumber(m.total),
+        formatNumber(m.returned),
+        formatNumber(m.late),
+      ]),
+      theme: 'grid',
+      styles: { fontSize: 8.5, cellPadding: 2 },
+      headStyles: { fillColor: [20, 20, 20], textColor: 255 },
+      margin: { left: marginX, right: marginX },
+    })
+
+    y = doc.lastAutoTable.finalY + 10
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.text('Ranking Kelas Bulan Ini', marginX, y)
+
+    y += 4
+    autoTable(doc, {
+      startY: y,
+      head: [['Rank', 'Kelas', 'Buku', 'Siswa', 'Score', 'Level']],
+      body: classMonthly.map(c => {
+        const level = getClassLevel(Number(c.score))
+        return [
+          formatNumber(c.rank),
+          c.class_name,
+          formatNumber(c.returned_count),
+          formatNumber(c.student_count),
+          formatScore(c.score),
+          level.name,
+        ]
+      }),
+      theme: 'grid',
+      styles: { fontSize: 8.5, cellPadding: 2 },
+      headStyles: { fillColor: [20, 20, 20], textColor: 255 },
+      margin: { left: marginX, right: marginX },
+    })
+
+    y = doc.lastAutoTable.finalY + 10
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.text('Distribusi Koleksi Buku', marginX, y)
+
+    y += 4
+    autoTable(doc, {
+      startY: y,
+      head: [['Kategori', 'Jumlah Buku']],
+      body: categoryData.map(([cat, total]) => [cat, formatNumber(total)]),
+      theme: 'grid',
+      styles: { fontSize: 8.5, cellPadding: 2 },
+      headStyles: { fillColor: [20, 20, 20], textColor: 255 },
+      margin: { left: marginX, right: marginX },
+    })
+
+    y = doc.lastAutoTable.finalY + 10
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.text('Analisis Jenis Buku Dipinjam', marginX, y)
+
+    y += 4
+    autoTable(doc, {
+      startY: y,
+      head: [['Jenis', 'Jumlah Peminjaman']],
+      body: bookTypeData.map(t => [t.label, formatNumber(t.value)]),
+      theme: 'grid',
+      styles: { fontSize: 8.5, cellPadding: 2 },
+      headStyles: { fillColor: [20, 20, 20], textColor: 255 },
+      margin: { left: marginX, right: marginX },
+    })
+
+    doc.save(`laporan-statistik-perpustakaan-${new Date().toISOString().slice(0, 10)}.pdf`)
+  }
+
+  const handleDownloadPdf = () => {
+    setGeneratingPdf(true)
+    try {
+      buildPdf()
+      setShowPdfModal(false)
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
@@ -293,7 +386,7 @@ export default function AdminReports() {
   }
 
   return (
-    <div className="fade-in report-printable">
+    <div className="fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700 }}>Laporan & Statistik</h1>
@@ -301,21 +394,21 @@ export default function AdminReports() {
         </div>
 
         <button
-          className="btn btn-secondary no-print"
-          onClick={handlePrint}
+          className="btn btn-primary"
+          onClick={openPdfDialog}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
         >
           <Printer size={16} />
-          Cetak / Simpan PDF
+          Cetak PDF Laporan
         </button>
       </div>
 
       {/* Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {[
-          { label: 'Total Peminjaman (12 bln)', val: monthlyBorrows.reduce((s, m) => s + m.total, 0), icon: BookOpen, color: '#87DB20', bg: '#f0fad9' },
-          { label: 'Terlambat (12 bln)', val: monthlyBorrows.reduce((s, m) => s + m.late, 0), icon: AlertTriangle, color: '#ef4444', bg: '#fef2f2' },
-          { label: 'Total Denda Terkumpul', val: `Rp ${fineData.total.toLocaleString('id-ID')}`, icon: HandCoins, color: '#f59e0b', bg: '#fffbeb' },
+          { label: 'Total Peminjaman (12 bln)', val: monthlyTotal, icon: BookOpen, color: '#87DB20', bg: '#f0fad9' },
+          { label: 'Terlambat (12 bln)', val: monthlyLate, icon: AlertTriangle, color: '#ef4444', bg: '#fef2f2' },
+          { label: 'Total Denda Terkumpul', val: `Rp ${formatNumber(fineData.total)}`, icon: HandCoins, color: '#f59e0b', bg: '#fffbeb' },
           { label: 'Kasus Keterlambatan', val: fineData.count, icon: TrendingUp, color: '#8b5cf6', bg: '#f5f3ff' },
         ].map((s, i) => (
           <div key={i} className="card" style={{ padding: '20px' }}>
@@ -349,7 +442,7 @@ export default function AdminReports() {
         <div className="card" style={{ padding: '24px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>Progress Kelas Bulan Ini</h3>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-            Level: Pemula Membaca, Sahabat Buku, Bintang Perpustakaan
+            Level berdasarkan score leaderboard
           </p>
 
           <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -376,7 +469,8 @@ export default function AdminReports() {
                       label: ctx => {
                         const idx = ctx.dataIndex
                         const row = classMonthly[idx]
-                        return ` ${ctx.raw} buku • skor ${formatScore(row?.score)}`
+                        const level = getClassLevel(Number(row?.score))
+                        return ` ${ctx.raw} buku • ${formatScore(row?.score)} • ${level.name}`
                       },
                     },
                     titleFont: chartTooltipFont,
@@ -449,7 +543,7 @@ export default function AdminReports() {
                     Paling banyak dipinjam:
                   </div>
                   <div style={{ fontSize: '14px', fontWeight: 700 }}>
-                    {bookTypeData[0]?.label || '-'}
+                    {bookTypeData.sort((a, b) => b.value - a.value)[0]?.label || '-'}
                   </div>
                 </div>
               </>
@@ -462,38 +556,97 @@ export default function AdminReports() {
         </div>
       </div>
 
+      {/* PDF Preview Modal */}
+      {showPdfModal && (
+        <div
+          onClick={() => !generatingPdf && setShowPdfModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '540px',
+              background: 'white',
+              borderRadius: '16px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', borderBottom: '1px solid var(--border-light)' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700 }}>Cetak PDF Laporan</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Laporan formal 1–3 halaman berisi data, tabel, dan grafik ringkas.
+                </p>
+              </div>
+              <button
+                onClick={() => !generatingPdf && setShowPdfModal(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                <div className="card" style={{ padding: '14px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Total Peminjaman</div>
+                  <div style={{ fontSize: '18px', fontWeight: 800 }}>{formatNumber(monthlyTotal)}</div>
+                </div>
+                <div className="card" style={{ padding: '14px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ranking Kelas</div>
+                  <div style={{ fontSize: '18px', fontWeight: 800 }}>{classMonthly.length}</div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                PDF akan memuat:
+                <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
+                  <li>Ringkasan statistik</li>
+                  <li>Tren peminjaman 12 bulan</li>
+                  <li>Ranking kelas bulan ini</li>
+                  <li>Distribusi koleksi buku</li>
+                  <li>Analisis jenis buku dipinjam</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', padding: '16px 20px', borderTop: '1px solid var(--border-light)' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowPdfModal(false)}
+                disabled={generatingPdf}
+              >
+                Batal
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleDownloadPdf}
+                disabled={generatingPdf}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Download size={16} />
+                {generatingPdf ? 'Menyiapkan PDF...' : 'Download PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @media (max-width: 900px) {
           .charts-grid {
             grid-template-columns: 1fr !important;
-          }
-        }
-
-        @media print {
-          body {
-            background: white !important;
-          }
-
-          .no-print {
-            display: none !important;
-          }
-
-          .report-printable {
-            width: 100% !important;
-          }
-
-          .card {
-            box-shadow: none !important;
-            border: 1px solid #e5e7eb !important;
-            break-inside: avoid;
-          }
-
-          .charts-grid {
-            grid-template-columns: 1fr !important;
-          }
-
-          .fade-in {
-            animation: none !important;
           }
         }
       `}</style>

@@ -13,6 +13,8 @@
     "@supabase/supabase-js": "^2.97.0",
     "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lord-icon-element": "^4.1.2",
     "lottie-web": "^5.13.0",
     "lucide-react": "^0.577.0",
@@ -21,7 +23,7 @@
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.13.1",
-    "sweetalert2": "^11.26.20"
+    "sweetalert2": "^11.26.25"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -62,6 +62,10 @@ export default function GuruProfile() {
   const [classRanking, setClassRanking] = useState([])
   const [topStudents, setTopStudents] = useState([])
   const [monthlyTrend, setMonthlyTrend] = useState([])
+  const [classBadges, setClassBadges] = useState([])
+  const [allClassAchievements, setAllClassAchievements] = useState({})
+  const [classNamesMap, setClassNamesMap] = useState({})
+  const [hoveredBadge, setHoveredBadge] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('kelas')
 
@@ -83,6 +87,38 @@ export default function GuruProfile() {
           .order('name')
         setStudents(studentData || [])
       }
+
+      // Achievement badges kelas guru sendiri
+      if (classId) {
+        const { data: achBadges } = await supabase
+          .from('class_badges')
+          .select('badge_name, badge_meta, awarded_at')
+          .eq('class_id', classId)
+          .eq('badge_meta->>type', 'achievement')
+          .order('awarded_at', { ascending: true })
+        setClassBadges(achBadges || [])
+      }
+
+      // Fetch semua achievement badges semua kelas
+      const [{ data: allAch }, { data: allClasses }] = await Promise.all([
+        supabase
+          .from('class_badges')
+          .select('class_id, badge_name, badge_meta, awarded_at')
+          .eq('badge_meta->>type', 'achievement')
+          .order('awarded_at', { ascending: true }),
+        supabase.from('classes').select('id, name, teacher'),
+      ])
+
+      const achMap = {}
+      ;(allAch || []).forEach(b => {
+        if (!achMap[b.class_id]) achMap[b.class_id] = []
+        achMap[b.class_id].push(b)
+      })
+      setAllClassAchievements(achMap)
+
+      const namesMap = {}
+      ;(allClasses || []).forEach(c => { namesMap[c.id] = c })
+      setClassNamesMap(namesMap)
 
       // Ranking kelas bulan ini: returned transaction / jumlah siswa
       const [classesRes, txnsRes, studentsRes] = await Promise.all([
@@ -342,6 +378,99 @@ export default function GuruProfile() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Achievement Badge — semua kelas */}
+      <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <span style={{ fontSize: '16px' }}>🏅</span>
+          <h3 style={{ fontSize: '14px', fontWeight: 700 }}>Achievement Kelas</h3>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 400 }}>— badge permanen per kelas</span>
+        </div>
+
+        {Object.keys(allClassAchievements).length === 0 ? (
+          <div className="empty-state" style={{ padding: '20px 0' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Belum ada kelas yang meraih achievement.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {Object.entries(allClassAchievements)
+              .sort(([a], [b]) => {
+                if (Number(a) === Number(profile?.class_id)) return -1
+                if (Number(b) === Number(profile?.class_id)) return 1
+                return (classNamesMap[a]?.name || '').localeCompare(classNamesMap[b]?.name || '')
+              })
+              .map(([classId, badges]) => {
+                const cls = classNamesMap[classId]
+                const isMyClass = Number(classId) === Number(profile?.class_id)
+                return (
+                  <div key={classId} style={{
+                    padding: '12px 16px', borderRadius: '12px',
+                    border: isMyClass ? '2px solid #3b82f6' : '1px solid var(--border-light)',
+                    background: isMyClass ? '#eff6ff' : 'var(--bg-light)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700 }}>{cls?.name || `Kelas ${classId}`}</span>
+                      {isMyClass && (
+                        <span style={{ fontSize: '10px', background: '#3b82f6', color: 'white', padding: '2px 8px', borderRadius: '20px', fontWeight: 700 }}>
+                          Kelas Saya
+                        </span>
+                      )}
+                      {cls?.teacher && (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>• {cls.teacher}</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {badges.map((b, i) => {
+                        const emoji = b.badge_meta?.emoji || '🏅'
+                        const tooltipKey = `guru-ach-${classId}-${i}`
+                        const isHovered = hoveredBadge === tooltipKey
+                        const awardedDate = new Date(b.awarded_at).toLocaleDateString('id-ID', {
+                          day: 'numeric', month: 'long', year: 'numeric'
+                        })
+                        return (
+                          <div key={i} style={{ position: 'relative', display: 'inline-block' }}
+                            onMouseEnter={() => setHoveredBadge(tooltipKey)}
+                            onMouseLeave={() => setHoveredBadge(null)}
+                          >
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              padding: '4px 10px', background: 'white',
+                              border: '1.5px solid #d97706', borderRadius: '20px',
+                              fontSize: '11px', fontWeight: 700, color: '#92400e',
+                              cursor: 'default', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                            }}>
+                              {emoji} {b.badge_name}
+                            </span>
+                            {isHovered && (
+                              <div style={{
+                                position: 'absolute', bottom: 'calc(100% + 6px)',
+                                left: '50%', transform: 'translateX(-50%)',
+                                background: '#1a1f0e', color: 'white',
+                                padding: '6px 12px', borderRadius: '8px',
+                                fontSize: '11px', fontWeight: 500,
+                                whiteSpace: 'nowrap', zIndex: 100, pointerEvents: 'none',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                              }}>
+                                Tercapai pada {awardedDate}
+                                <div style={{
+                                  position: 'absolute', top: '100%', left: '50%',
+                                  transform: 'translateX(-50%)', width: 0, height: 0,
+                                  borderLeft: '5px solid transparent',
+                                  borderRight: '5px solid transparent',
+                                  borderTop: '5px solid #1a1f0e',
+                                }} />
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
           </div>
         )}
       </div>

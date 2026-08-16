@@ -43,8 +43,10 @@ function formatScore(score) {
 export default function AdminLeaderboard() {
   const [classData, setClassData] = useState([])
   const [topStudents, setTopStudents] = useState([])
+  const [achievementBadges, setAchievementBadges] = useState({}) // classId -> badges[]
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState('classes') // classes | students
+  const [hoveredBadge, setHoveredBadge] = useState(null) // {classId, badgeName, x, y}
 
   useEffect(() => {
     fetchLeaderboardData()
@@ -98,6 +100,20 @@ export default function AdminLeaderboard() {
         .sort((a, b) => b.score - a.score || b.count - a.count || a.name.localeCompare(b.name))
 
       setClassData(rankedClasses)
+
+      // Fetch achievement badges (type: achievement) untuk semua kelas
+      const { data: achData } = await supabase
+        .from('class_badges')
+        .select('class_id, badge_name, badge_meta, awarded_at')
+        .eq('badge_meta->>type', 'achievement')
+        .order('awarded_at', { ascending: true })
+
+      const achMap = {}
+      ;(achData || []).forEach(b => {
+        if (!achMap[b.class_id]) achMap[b.class_id] = []
+        achMap[b.class_id].push(b)
+      })
+      setAchievementBadges(achMap)
 
       const { data: pointsData } = await supabase
         .from('points_log')
@@ -335,6 +351,74 @@ export default function AdminLeaderboard() {
                           <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                             Wali Kelas: {cls.teacher}
                           </p>
+                        )}
+
+                        {/* Achievement Badges */}
+                        {(achievementBadges[cls.id] || []).length > 0 && (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                            {achievementBadges[cls.id].map((ab, ai) => {
+                              const emoji = ab.badge_meta?.emoji || '🏅'
+                              const tooltipKey = `${cls.id}-${ab.badge_name}`
+                              const isHovered = hoveredBadge === tooltipKey
+                              const awardedDate = new Date(ab.awarded_at).toLocaleDateString('id-ID', {
+                                day: 'numeric', month: 'long', year: 'numeric'
+                              })
+                              return (
+                                <div
+                                  key={ai}
+                                  style={{ position: 'relative', display: 'inline-block' }}
+                                  onMouseEnter={() => setHoveredBadge(tooltipKey)}
+                                  onMouseLeave={() => setHoveredBadge(null)}
+                                >
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                    padding: '3px 10px',
+                                    background: 'white',
+                                    border: '1.5px solid #d97706',
+                                    borderRadius: '20px',
+                                    fontSize: '11px', fontWeight: 700,
+                                    color: '#92400e',
+                                    cursor: 'default',
+                                    userSelect: 'none',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                                  }}>
+                                    {emoji} {ab.badge_name}
+                                  </span>
+                                  {/* Tooltip */}
+                                  {isHovered && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      bottom: 'calc(100% + 6px)',
+                                      left: '50%',
+                                      transform: 'translateX(-50%)',
+                                      background: '#1a1f0e',
+                                      color: 'white',
+                                      padding: '6px 12px',
+                                      borderRadius: '8px',
+                                      fontSize: '11px',
+                                      fontWeight: 500,
+                                      whiteSpace: 'nowrap',
+                                      zIndex: 100,
+                                      pointerEvents: 'none',
+                                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                                    }}>
+                                      Tercapai pada {awardedDate}
+                                      {/* Arrow */}
+                                      <div style={{
+                                        position: 'absolute',
+                                        top: '100%', left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 0, height: 0,
+                                        borderLeft: '5px solid transparent',
+                                        borderRight: '5px solid transparent',
+                                        borderTop: '5px solid #1a1f0e',
+                                      }} />
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
                         )}
                       </div>
 

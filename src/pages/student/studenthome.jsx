@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/authcontext'
 import { Search, MapPin, BookOpen, Tag, Filter, X, CheckCircle, Clock } from 'lucide-react'
@@ -17,6 +17,10 @@ export default function StudentHome() {
   const [activeBorrows, setActiveBorrows] = useState([])
   const [hasFine, setHasFine] = useState(false)
   const [borrowCountPerBook, setBorrowCountPerBook] = useState({})
+  const realtimeChannelRef = useRef(null)
+  const booksRef = useRef([])
+
+  useEffect(() => { booksRef.current = books }, [books])
 
   useEffect(() => {
     fetchBooks()
@@ -25,6 +29,29 @@ export default function StudentHome() {
       checkStudentStatus()
     }
   }, [search, filterCategory, filterType, filterStatus, profile])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`transactions-stok-siswa-${Math.random().toString(36).slice(2)}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions' },
+        () => {
+          if (booksRef.current.length > 0) {
+            fetchBorrowCounts(booksRef.current)
+          }
+        }
+      )
+      .subscribe()
+
+    realtimeChannelRef.current = channel
+
+    return () => {
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current)
+      }
+    }
+  }, [])
 
   const fetchCategories = async () => {
     const { data } = await supabase.from('books').select('category').not('category', 'is', null)
@@ -67,24 +94,27 @@ export default function StudentHome() {
     const { data, error } = await query.limit(60)
     if (!error) {
       setBooks(data || [])
-      fetchBorrowCounts(data || [])
+      await fetchBorrowCounts(data || [])
     }
     setLoading(false)
   }
 
   const fetchBorrowCounts = async (bookList) => {
-    if (!bookList.length) return
+    if (!bookList || !bookList.length) {
+      setBorrowCountPerBook({})
+      return
+    }
     const bookIds = bookList.map(b => b.id)
-    const { data } = await supabase
-      .from('transactions')
+    const { data, error } = await supabase
+      .from('book_borrow_counts')
       .select('book_id')
       .in('book_id', bookIds)
-      .in('status', ['borrowed', 'pending', 'late'])
+    if (error) { console.error('fetchBorrowCounts error:', error); return }
     const counts = {}
     ;(data || []).forEach(t => {
       counts[t.book_id] = (counts[t.book_id] || 0) + 1
     })
-    setBorrowCountPerBook(counts)
+    setBorrowCountPerBook({ ...counts })
   }
 
   const handleBorrow = async (book) => {
@@ -106,7 +136,19 @@ export default function StudentHome() {
       return
     }
 
-    if (book.status !== 'available') {
+    if (book.stock > 0) {
+      const { data: activeTx } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('book_id', book.id)
+        .in('status', ['borrowed', 'pending', 'late'])
+      const activeCount = activeTx?.length || 0
+      if (activeCount >= book.stock) {
+        toast.error('Stok buku ini sudah habis.')
+        fetchBooks() // refresh tampilan
+        return
+      }
+    } else if (book.status !== 'available') {
       toast.error('Buku ini sedang dipinjam oleh siswa lain.')
       return
     }
@@ -124,15 +166,13 @@ export default function StudentHome() {
 
       if (txError) throw txError
 
-      await supabase.from('books').update({ status: 'borrowed' }).eq('id', book.id)
-
       toast.success(
         `Permintaan pinjam "${book.title}" berhasil! Ambil buku di perpustakaan dan tunjukkan ke admin untuk konfirmasi.`,
-        { duration: 5000 }
+        { duration: 3000 }
       )
 
-      fetchBooks()
-      checkStudentStatus()
+      await checkStudentStatus()
+      await fetchBooks()
     } catch (err) {
       toast.error(err.message)
     } finally {

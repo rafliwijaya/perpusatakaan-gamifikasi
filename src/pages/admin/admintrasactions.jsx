@@ -120,26 +120,66 @@ export default function AdminTransactions() {
     setLoading(false)
   }
 
+  const handleReject = async (t) => {
+    if (!confirm(`Tolak peminjaman "${t.books?.title}" oleh ${t.students?.name}?`)) return
+    setProcessingId(t.id)
+    try {
+      await supabase.from('transactions').update({ status: 'cancelled' }).eq('id', t.id)
+      // Kembalikan status buku jadi available jika tidak ada aktif lain
+      const { count: stillActive } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('book_id', t.book_id)
+        .in('status', ['borrowed', 'pending', 'late'])
+      if (!stillActive || stillActive === 0) {
+        await supabase.from('books').update({ status: 'available' }).eq('id', t.book_id)
+      }
+      toast.success(`Peminjaman ditolak: ${t.books?.title}`)
+      fetchTransactions()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
   const handleApprove = async (t) => {
     setProcessingId(t.id)
     try {
-      await supabase.from('transactions').update({ status: 'borrowed' }).eq('id', t.id)
-
-      // cek apakah stok habis setelah approve
+      // Cek stok real-time sebelum ACC — hindari ACC melebihi stok fisik
       const { data: bookData } = await supabase
-        .from('books')
-        .select('stock')
-        .eq('id', t.book_id)
-        .single()
+        .from('books').select('stock').eq('id', t.book_id).single()
 
       if (bookData?.stock > 0) {
-        const { count: activeBorrows } = await supabase
+        const { count: activeNow } = await supabase
           .from('transactions')
           .select('*', { count: 'exact', head: true })
           .eq('book_id', t.book_id)
           .in('status', ['borrowed', 'late'])
 
-        if (activeBorrows >= bookData.stock) {
+        if (activeNow >= bookData.stock) {
+          // Stok sudah penuh — otomatis tolak
+          await supabase.from('transactions').update({ status: 'cancelled' }).eq('id', t.id)
+          toast.error(
+            `Stok buku "${t.books?.title}" sudah habis (${activeNow}/${bookData.stock}). Peminjaman otomatis ditolak.`,
+            { duration: 6000 }
+          )
+          fetchTransactions()
+          setProcessingId(null)
+          return
+        }
+      }
+
+      await supabase.from('transactions').update({ status: 'borrowed' }).eq('id', t.id)
+
+      // Cek apakah stok habis setelah ACC ini
+      if (bookData?.stock > 0) {
+        const { count: afterAcc } = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('book_id', t.book_id)
+          .in('status', ['borrowed', 'late'])
+        if (afterAcc >= bookData.stock) {
           await supabase.from('books').update({ status: 'borrowed' }).eq('id', t.book_id)
         }
       }
@@ -152,6 +192,7 @@ export default function AdminTransactions() {
       setProcessingId(null)
     }
   }
+
 
   const handleReturn = async (t) => {
     setProcessingId(t.id)
@@ -189,6 +230,7 @@ export default function AdminTransactions() {
       })
 
       await checkClassBadge(t.class_id)
+      await checkAchievementBadges(t.class_id)
 
       toast.success(`Buku berhasil dikembalikan${fine > 0 ? ` (denda Rp ${fine.toLocaleString('id-ID')})` : ''}`)
       fetchTransactions()
@@ -229,6 +271,7 @@ export default function AdminTransactions() {
       .from('class_badges')
       .select('id, badge_name')
       .eq('class_id', classId)
+      .is('badge_meta->>type', null)   // hanya badge level, bukan achievement
       .gte('awarded_at', startOfMonth)
       .lt('awarded_at', startOfNextMonth)
       .order('awarded_at', { ascending: false })
@@ -277,6 +320,136 @@ export default function AdminTransactions() {
     }
 
     toast.success(`🏆 Kelas berhasil meraih badge: ${badge.name}!`, { duration: 5000 })
+  }
+
+  // ACHIEVEMENT BADGES
+  const checkAchievementBadges = async (classId) => {
+    if (!classId) return
+
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+    const endOfPrevMonth = startOfMonth
+
+    const { count: totalReturned } = await supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('class_id', classId)
+      .eq('status', 'returned')
+
+    const { data: existingAchievements } = await supabase
+      .from('class_badges')
+      .select('badge_name')
+      .eq('class_id', classId)
+      .eq('badge_meta->>type', 'achievement')
+
+    const owned = new Set((existingAchievements || []).map(b => b.badge_name))
+
+    const newBadges = []
+
+    // 1. Langkah Pertama minimal 20 transaksi returned sepanjang waktu
+    if (!owned.has('Langkah Pertama') && totalReturned >= 20) {
+      newBadges.push({
+        badge_name: 'Langkah Pertama',
+        badge_meta: { type: 'achievement', emoji: '⭐', total_returned: totalReturned }
+      })
+    }
+
+    // 2. Kelas Gemar Membaca minmal 75 transaksi returned blan ini
+    const { count: thisMonthReturned } = await supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('class_id', classId)
+      .eq('status', 'returned')
+      .gte('return_date', startOfMonth)
+
+    if (!owned.has('Kelas Gemar Membaca') && thisMonthReturned >= 75) {
+      newBadges.push({
+        badge_name: 'Kelas Gemar Membaca',
+        badge_meta: { type: 'achievement', emoji: '📖', this_month: thisMonthReturned }
+      })
+    }
+
+    // 3. Kelas Aktif transaksi bulan ini naik minimal 25% dari bulan lalu
+    const { count: prevMonthReturned } = await supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('class_id', classId)
+      .eq('status', 'returned')
+      .gte('return_date', startOfPrevMonth)
+      .lt('return_date', endOfPrevMonth)
+
+    if (prevMonthReturned > 0) {
+      const growth = (thisMonthReturned - prevMonthReturned) / prevMonthReturned
+      const { data: activeThisMonth } = await supabase
+        .from('class_badges')
+        .select('id')
+        .eq('class_id', classId)
+        .eq('badge_name', 'Kelas Aktif')
+        .gte('awarded_at', startOfMonth)
+        .maybeSingle()
+
+      if (!activeThisMonth && growth >= 0.25) {
+        newBadges.push({
+          badge_name: 'Kelas Aktif',
+          badge_meta: {
+            type: 'achievement', emoji: '🚀',
+            prev_month: prevMonthReturned,
+            this_month: thisMonthReturned,
+            growth_pct: Math.round(growth * 100)
+          }
+        })
+      }
+    }
+
+    // 4. Penjelajah Buku meminjam dari minimal 4 kategori berbeda bulan ini
+    const { data: categoryData } = await supabase
+      .from('transactions')
+      .select('books(category)')
+      .eq('class_id', classId)
+      .eq('status', 'returned')
+      .gte('return_date', startOfMonth)
+
+    const uniqueCategories = new Set(
+      (categoryData || [])
+        .map(t => t.books?.category)
+        .filter(Boolean)
+    )
+
+    const { data: explorerThisMonth } = await supabase
+      .from('class_badges')
+      .select('id')
+      .eq('class_id', classId)
+      .eq('badge_name', 'Penjelajah Buku')
+      .gte('awarded_at', startOfMonth)
+      .maybeSingle()
+
+    if (!explorerThisMonth && uniqueCategories.size >= 4) {
+      newBadges.push({
+        badge_name: 'Penjelajah Buku',
+        badge_meta: {
+          type: 'achievement', emoji: '🗺️',
+          categories: [...uniqueCategories],
+          category_count: uniqueCategories.size
+        }
+      })
+    }
+
+    if (newBadges.length > 0) {
+      const inserts = newBadges.map(b => ({
+        class_id: classId,
+        badge_name: b.badge_name,
+        badge_meta: b.badge_meta,
+        awarded_at: new Date().toISOString(),
+      }))
+      await supabase.from('class_badges').insert(inserts)
+      newBadges.forEach(b => {
+        toast.success(
+          `🏅 Kelas meraih achievement: ${b.badge_meta.emoji} ${b.badge_name}!`,
+          { duration: 6000 }
+        )
+      })
+    }
   }
 
   const statusTabs = [
@@ -528,14 +701,24 @@ export default function AdminTransactions() {
                       <td>
                         <div style={{ display: 'flex', gap: '6px' }}>
                           {t.status === 'pending' && (
-                            <button
-                              className="btn btn-primary btn-sm"
-                              onClick={() => handleApprove(t)}
-                              disabled={processingId === t.id}
-                            >
-                              <CheckCircle size={12} />
-                              ACC
-                            </button>
+                            <>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => handleApprove(t)}
+                                disabled={processingId === t.id}
+                              >
+                                <CheckCircle size={12} />
+                                ACC
+                              </button>
+                              <button
+                                className="btn btn-sm"
+                                onClick={() => handleReject(t)}
+                                disabled={processingId === t.id}
+                                style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444' }}
+                              >
+                                ✕ Tolak
+                              </button>
+                            </>
                           )}
                           {(t.status === 'borrowed' || t.status === 'late') && (
                             <button

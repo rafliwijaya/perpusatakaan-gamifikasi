@@ -332,15 +332,57 @@ export default function AdminDashboard() {
                 }}
               >← Prev</button>
 
-              {Array.from({ length: Math.ceil(allTransactions.length / TX_PER_PAGE) }, (_, i) => (
-                <button key={i} onClick={() => setTxPage(i + 1)} style={{
-                  width: '34px', height: '34px', borderRadius: '8px', border: '1.5px solid',
-                  borderColor: txPage === i + 1 ? 'var(--primary)' : 'var(--border)',
-                  background: txPage === i + 1 ? 'var(--primary)' : 'white',
-                  color: txPage === i + 1 ? '#1a1f0e' : 'var(--text-secondary)',
-                  cursor: 'pointer', fontFamily: 'Poppins', fontWeight: 600, fontSize: '13px',
-                }}>{i + 1}</button>
-              ))}
+              {(() => {
+                const total = Math.ceil(allTransactions.length / TX_PER_PAGE)
+                if (total <= 8) {
+                  // Kalau halaman sedikit, tampilkan semua
+                  return Array.from({ length: total }, (_, i) => (
+                    <button key={i} onClick={() => setTxPage(i + 1)} style={{
+                      width: '34px', height: '34px', borderRadius: '8px', border: '1.5px solid',
+                      borderColor: txPage === i + 1 ? 'var(--primary)' : 'var(--border)',
+                      background: txPage === i + 1 ? 'var(--primary)' : 'white',
+                      color: txPage === i + 1 ? '#1a1f0e' : 'var(--text-secondary)',
+                      cursor: 'pointer', fontFamily: 'Poppins', fontWeight: 600, fontSize: '13px',
+                    }}>{i + 1}</button>
+                  ))
+                }
+
+                // Smart pagination: page 1 terkunci, 2 page terakhir terkunci, tengah dinamis
+                const pages = new Set()
+                pages.add(1)
+                pages.add(total - 1)
+                pages.add(total)
+                // Tambah halaman sekitar current
+                for (let i = Math.max(2, txPage - 1); i <= Math.min(total - 2, txPage + 1); i++) {
+                  pages.add(i)
+                }
+                const sortedPages = [...pages].sort((a, b) => a - b)
+
+                const result = []
+                let prev = 0
+                sortedPages.forEach(p => {
+                  if (p - prev > 1) {
+                    result.push(
+                      <span key={`dot-${p}`} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '34px', height: '34px', fontSize: '13px', color: 'var(--text-muted)',
+                        fontWeight: 600,
+                      }}>...</span>
+                    )
+                  }
+                  result.push(
+                    <button key={p} onClick={() => setTxPage(p)} style={{
+                      width: '34px', height: '34px', borderRadius: '8px', border: '1.5px solid',
+                      borderColor: txPage === p ? 'var(--primary)' : 'var(--border)',
+                      background: txPage === p ? 'var(--primary)' : 'white',
+                      color: txPage === p ? '#1a1f0e' : 'var(--text-secondary)',
+                      cursor: 'pointer', fontFamily: 'Poppins', fontWeight: 600, fontSize: '13px',
+                    }}>{p}</button>
+                  )
+                  prev = p
+                })
+                return result
+              })()}
 
               <button
                 onClick={() => setTxPage(p => Math.min(Math.ceil(allTransactions.length / TX_PER_PAGE), p + 1))}

@@ -43,6 +43,7 @@ function formatScore(score) {
 
 export default function AdminTransactions() {
   const [transactions, setTransactions] = useState([])
+  const [realCounts, setRealCounts] = useState({ pending: 0, borrowed: 0, late: 0 })
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all | pending | borrowed | late | returned
   const [search, setSearch] = useState('')
@@ -50,6 +51,7 @@ export default function AdminTransactions() {
 
   useEffect(() => {
     fetchTransactions()
+    fetchRealCounts()
     // Auto-expire pending orders > 2 hours
     expirePendingOrders()
     // Auto-flag late returns
@@ -90,6 +92,19 @@ export default function AdminTransactions() {
           .eq('id', t.id)
       }
     }
+  }
+
+  const fetchRealCounts = async () => {
+    const [pendingRes, borrowedRes, lateRes] = await Promise.all([
+      supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'borrowed'),
+      supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'late'),
+    ])
+    setRealCounts({
+      pending: pendingRes.count || 0,
+      borrowed: borrowedRes.count || 0,
+      late: lateRes.count || 0,
+    })
   }
 
   const fetchTransactions = async () => {
@@ -136,6 +151,7 @@ export default function AdminTransactions() {
       }
       toast.success(`Peminjaman ditolak: ${t.books?.title}`)
       fetchTransactions()
+      fetchRealCounts()
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -186,6 +202,7 @@ export default function AdminTransactions() {
 
       toast.success(`Peminjaman disetujui: ${t.books?.title}`)
       fetchTransactions()
+      fetchRealCounts()
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -234,6 +251,7 @@ export default function AdminTransactions() {
 
       toast.success(`Buku berhasil dikembalikan${fine > 0 ? ` (denda Rp ${fine.toLocaleString('id-ID')})` : ''}`)
       fetchTransactions()
+      fetchRealCounts()
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -460,10 +478,8 @@ export default function AdminTransactions() {
     { id: 'returned', label: 'Dikembalikan' },
   ]
 
-  const counts = { pending: 0, borrowed: 0, late: 0 }
-  transactions.forEach(t => {
-    if (counts[t.status] !== undefined) counts[t.status]++
-  })
+  // Gunakan realCounts dari DB — bukan dari transactions state yang terbatas limit(50)
+  const counts = realCounts
 
   return (
     <div className="fade-in">

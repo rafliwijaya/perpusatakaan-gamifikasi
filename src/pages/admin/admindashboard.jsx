@@ -311,38 +311,39 @@ export default function AdminDashboard() {
         {/* Pagination — hanya muncul jika lebih dari 15 transaksi */}
         {allTransactions.length > TX_PER_PAGE && (
           <div style={{
-            padding: '14px 24px',
+            padding: '12px 16px',
             borderTop: '1px solid var(--border-light)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px',
           }}>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               Halaman {txPage} dari {Math.ceil(allTransactions.length / TX_PER_PAGE)}
             </span>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'nowrap', overflowX: 'auto' }}>
               <button
                 onClick={() => setTxPage(p => Math.max(1, p - 1))}
                 disabled={txPage === 1}
                 style={{
-                  padding: '7px 14px', borderRadius: '8px',
+                  padding: '5px 10px', borderRadius: '6px',
                   border: '1.5px solid var(--border)', background: 'white',
                   cursor: txPage === 1 ? 'not-allowed' : 'pointer',
-                  fontFamily: 'Poppins, sans-serif', fontSize: '13px', fontWeight: 600,
+                  fontFamily: 'Poppins, sans-serif', fontSize: '12px', fontWeight: 600,
                   color: txPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
-                  opacity: txPage === 1 ? 0.45 : 1, transition: 'opacity 0.15s',
+                  opacity: txPage === 1 ? 0.45 : 1, transition: 'opacity 0.15s', flexShrink: 0,
                 }}
               >← Prev</button>
 
               {(() => {
                 const total = Math.ceil(allTransactions.length / TX_PER_PAGE)
-                if (total <= 8) {
-                  // Kalau halaman sedikit, tampilkan semua
+                if (total <= 5) {
+                  // Kalau halaman sedikit (≤5), tampilkan semua
                   return Array.from({ length: total }, (_, i) => (
                     <button key={i} onClick={() => setTxPage(i + 1)} style={{
-                      width: '34px', height: '34px', borderRadius: '8px', border: '1.5px solid',
+                      width: '28px', height: '28px', borderRadius: '6px', border: '1.5px solid',
                       borderColor: txPage === i + 1 ? 'var(--primary)' : 'var(--border)',
                       background: txPage === i + 1 ? 'var(--primary)' : 'white',
                       color: txPage === i + 1 ? '#1a1f0e' : 'var(--text-secondary)',
-                      cursor: 'pointer', fontFamily: 'Poppins', fontWeight: 600, fontSize: '13px',
+                      cursor: 'pointer', fontFamily: 'Poppins', fontWeight: 600, fontSize: '12px',
+                      flexShrink: 0,
                     }}>{i + 1}</button>
                   ))
                 }
@@ -365,18 +366,19 @@ export default function AdminDashboard() {
                     result.push(
                       <span key={`dot-${p}`} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: '34px', height: '34px', fontSize: '13px', color: 'var(--text-muted)',
-                        fontWeight: 600,
+                        width: '20px', height: '28px', fontSize: '12px', color: 'var(--text-muted)',
+                        fontWeight: 600, flexShrink: 0,
                       }}>...</span>
                     )
                   }
                   result.push(
                     <button key={p} onClick={() => setTxPage(p)} style={{
-                      width: '34px', height: '34px', borderRadius: '8px', border: '1.5px solid',
+                      width: '28px', height: '28px', borderRadius: '6px', border: '1.5px solid',
                       borderColor: txPage === p ? 'var(--primary)' : 'var(--border)',
                       background: txPage === p ? 'var(--primary)' : 'white',
                       color: txPage === p ? '#1a1f0e' : 'var(--text-secondary)',
-                      cursor: 'pointer', fontFamily: 'Poppins', fontWeight: 600, fontSize: '13px',
+                      cursor: 'pointer', fontFamily: 'Poppins', fontWeight: 600, fontSize: '12px',
+                      flexShrink: 0,
                     }}>{p}</button>
                   )
                   prev = p
@@ -388,12 +390,12 @@ export default function AdminDashboard() {
                 onClick={() => setTxPage(p => Math.min(Math.ceil(allTransactions.length / TX_PER_PAGE), p + 1))}
                 disabled={txPage === Math.ceil(allTransactions.length / TX_PER_PAGE)}
                 style={{
-                  padding: '7px 14px', borderRadius: '8px',
+                  padding: '5px 10px', borderRadius: '6px',
                   border: '1.5px solid var(--border)', background: 'white',
                   cursor: txPage === Math.ceil(allTransactions.length / TX_PER_PAGE) ? 'not-allowed' : 'pointer',
-                  fontFamily: 'Poppins, sans-serif', fontSize: '13px', fontWeight: 600,
+                  fontFamily: 'Poppins, sans-serif', fontSize: '12px', fontWeight: 600,
                   color: txPage === Math.ceil(allTransactions.length / TX_PER_PAGE) ? 'var(--text-muted)' : 'var(--text-primary)',
-                  opacity: txPage === Math.ceil(allTransactions.length / TX_PER_PAGE) ? 0.45 : 1, transition: 'opacity 0.15s',
+                  opacity: txPage === Math.ceil(allTransactions.length / TX_PER_PAGE) ? 0.45 : 1, transition: 'opacity 0.15s', flexShrink: 0,
                 }}
               >Next →</button>
             </div>

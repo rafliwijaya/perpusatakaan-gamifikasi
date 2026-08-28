@@ -156,9 +156,12 @@ export default function AdminReports() {
         (rankings || []).sort((a, b) => Number(a.rank) - Number(b.rank))
       )
 
+      // Hanya hitung denda dari transaksi yang SUDAH dikembalikan (status: returned)
+      // Transaksi 'late' yang belum dikembalikan tidak dihitung karena fine_amount-nya sementara
       const { data: fines } = await supabase
         .from('transactions')
         .select('fine_amount')
+        .eq('status', 'returned')
         .gt('fine_amount', 0)
 
       const totalFine = fines?.reduce((s, t) => s + (t.fine_amount || 0), 0) || 0
